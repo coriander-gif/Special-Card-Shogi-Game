@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>将棋</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -10,9 +10,15 @@
         
         body {
             font-family: 'Shippori Mincho', serif;
-            background-color: #9c785c; /* 画像に合わせた背景の茶色 */
+            /* 和紙のようなテクスチャとヴィネット（四隅が暗くなる）効果を追加 */
+            background-color: #8c6a4f;
+            background-image: 
+                radial-gradient(circle at center, transparent 30%, rgba(20, 10, 0, 0.6) 100%),
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+            background-attachment: fixed;
             touch-action: manipulation;
             color: #333;
+            min-height: 100vh;
         }
 
         #board {
@@ -207,31 +213,46 @@
         .card-area {
             display: flex;
             flex-wrap: wrap;
-            min-height: 32px;
+            min-height: 70px;
             width: 100%;
             max-width: 440px;
-            gap: 6px;
-            margin-top: 4px;
+            margin-top: 8px;
+            padding-top: 12px; /* ホバーで浮かせるための余白 */
+            padding-left: 5px;
+            gap: 8px;
         }
         .card {
-            background: #fff;
-            border: 2px solid #555;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 14px;
+            background: linear-gradient(135deg, #fdfbf7 0%, #e3ded6 100%);
+            border: 2px solid #a68a6d;
+            border-radius: 6px;
+            width: 40px;
+            height: 64px;
+            font-size: 13px;
             font-weight: bold;
+            color: #4a3623;
             cursor: pointer;
-            box-shadow: 1px 2px 4px rgba(0,0,0,0.2);
+            box-shadow: -2px 3px 5px rgba(0,0,0,0.3);
             user-select: none;
-            transition: all 0.1s;
+            transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.2s, z-index 0s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            writing-mode: vertical-rl; /* 文字を縦書きに */
+            text-orientation: upright;
+            letter-spacing: 1px;
+            position: relative;
         }
         .card:hover {
-            background: #f0f0f0;
-            transform: translateY(-1px);
+            transform: translateY(-12px);
+            z-index: 10;
+            box-shadow: -2px 10px 12px rgba(0,0,0,0.4);
         }
         .card.selected-card {
-            background: #ffeb3b;
-            border-color: #e65100;
+            background: linear-gradient(135deg, #fff59d 0%, #fbc02d 100%);
+            border-color: #f57f17;
+            transform: translateY(-12px);
+            z-index: 5;
+            box-shadow: -2px 8px 10px rgba(0,0,0,0.3);
         }
         .wall {
             background-color: #57534e;
@@ -293,11 +314,16 @@
 
     <!-- 後手エリア -->
     <div class="w-full flex justify-between items-start mb-2">
-        <div class="flex-1">
-            <div id="opponent-hand" class="hand-area justify-start"></div>
-            <div id="opponent-cards" class="card-area justify-start mt-2"></div>
+        <!-- 左上：後手の駒台 -->
+        <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
+            <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">後手の駒台</div>
+            <div id="opponent-hand" class="hand-area flex flex-wrap gap-1"></div>
         </div>
-        <div class="player-label ml-2">後手</div>
+        <!-- 右上：ラベルとカード -->
+        <div class="flex flex-col items-end flex-1 pl-2">
+            <div class="player-label mb-2">後手</div>
+            <div id="opponent-cards" class="card-area justify-end"></div>
+        </div>
     </div>
 
     <!-- 盤面 -->
@@ -305,11 +331,18 @@
 
     <!-- 先手エリア -->
     <div class="w-full flex justify-between items-end mt-4">
-        <div class="flex-1">
-            <div id="player-hand" class="hand-area justify-start"></div>
-            <div id="player-cards" class="card-area justify-start mt-2"></div>
+        <!-- 左下：カード -->
+        <div class="flex flex-col items-start flex-1 pr-2">
+            <div id="player-cards" class="card-area justify-start"></div>
         </div>
-        <div class="player-label ml-2">先手</div>
+        <!-- 右下：ラベルと駒台 -->
+        <div class="flex flex-col items-end">
+            <div class="player-label mb-2">先手</div>
+            <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
+                <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">先手の駒台</div>
+                <div id="player-hand" class="hand-area flex flex-wrap gap-1"></div>
+            </div>
+        </div>
     </div>
 
     <div id="message" class="text-xl font-bold mt-6 text-white bg-black/50 px-4 py-1 rounded">先手の番です</div>
