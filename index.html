@@ -10,7 +10,6 @@
         
         body {
             font-family: 'Yuji Syuku', serif;
-            /* 和紙のようなテクスチャとヴィネット（四隅が暗くなる）効果を追加 */
             background-color: #8c6a4f;
             background-image: 
                 radial-gradient(circle at center, transparent 30%, rgba(20, 10, 0, 0.6) 100%),
@@ -22,7 +21,7 @@
         }
 
         #board {
-            background-color: #d6aa69; /* 将棋盤の木目色 */
+            background-color: #d6aa69;
             border: 4px solid #5d4037;
             box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
             margin: 0 auto;
@@ -31,7 +30,7 @@
         .cell {
             width: 42px;
             height: 48px;
-            border: 1px solid #7a583e; /* マスの線の色 */
+            border: 1px solid #7a583e;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -56,12 +55,11 @@
             justify-content: center;
             align-items: center;
             font-weight: bold;
-            /* SVGで将棋の駒の形を描画 */
             background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 75,30 90,105 10,105 25,30" fill="%23fdf4d6" stroke="%23333" stroke-width="4" stroke-linejoin="round"/></svg>');
             background-size: 100% 100%;
             background-repeat: no-repeat;
             background-position: center;
-            padding-top: 10%; /* 駒の形に合わせて文字を少し下へ */
+            padding-top: 10%;
             color: #111;
             filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
         }
@@ -71,67 +69,15 @@
         }
 
         .promoted {
-            color: #d13030; /* 成り駒は赤色 */
+            color: #d13030;
         }
 
         .selected {
-            background-color: rgba(255, 255, 0, 0.4); /* 選択中のマス */
+            background-color: rgba(255, 255, 0, 0.4);
         }
 
         .highlight {
-            background-color: rgba(0, 255, 0, 0.2); /* 移動可能なマス */
-        }
-
-        #board {
-            background-color: #dcb35c; /* 将棋盤の色 */
-            border: 2px solid #333;
-            box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
-        }
-
-        .cell {
-            width: 40px;
-            height: 44px;
-            border: 1px solid #555;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            cursor: pointer;
-            user-select: none;
-            position: relative;
-        }
-
-        @media (min-width: 600px) {
-            .cell {
-                width: 48px;
-                height: 52px;
-                font-size: 28px;
-            }
-        }
-
-        .piece {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-        }
-
-        .opponent-piece {
-            transform: rotate(180deg);
-        }
-
-        .promoted {
-            color: #d13030; /* 成り駒は赤色 */
-        }
-
-        .selected {
-            background-color: rgba(255, 255, 0, 0.5); /* 選択中のマス */
-        }
-
-        .highlight {
-            background-color: rgba(0, 255, 0, 0.3); /* 移動可能なマス */
+            background-color: rgba(0, 255, 0, 0.2);
         }
         
         .highlight::after {
@@ -167,7 +113,6 @@
             font-size: 22px;
             cursor: pointer;
             user-select: none;
-            /* 持ち駒も駒の形にする */
             background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 75,30 90,105 10,105 25,30" fill="%23fdf4d6" stroke="%23333" stroke-width="4" stroke-linejoin="round"/></svg>');
             background-size: 100% 100%;
             padding-top: 10%;
@@ -209,7 +154,6 @@
             letter-spacing: 2px;
         }
 
-        /* 追加: カードシステム用CSS */
         .card-area {
             display: flex;
             flex-wrap: wrap;
@@ -217,7 +161,7 @@
             width: 100%;
             max-width: 440px;
             margin-top: 8px;
-            padding-top: 12px; /* ホバーで浮かせるための余白 */
+            padding-top: 12px;
             padding-left: 5px;
             gap: 8px;
         }
@@ -237,7 +181,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            writing-mode: vertical-rl; /* 文字を縦書きに */
+            writing-mode: vertical-rl;
             text-orientation: upright;
             letter-spacing: 1px;
             position: relative;
@@ -290,7 +234,6 @@
             z-index: 10;
         }
 
-        /* モーダル用 */
         #modal-overlay {
             display: none;
             position: fixed;
@@ -307,13 +250,81 @@
             border: 2px solid #5d4037;
             text-align: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            min-width: 300px;
         }
+        
+        .modal-input {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #7a583e;
+            border-radius: 4px;
+            font-size: 16px;
+            text-align: center;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* メニューバー */
+        #top-menu {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 40;
+        }
+        .menu-btn {
+            padding: 6px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        #menu-local {
+            background-color: #6e462e;
+            color: #ebd1ba;
+            border: 1px solid #5d4037;
+        }
+        #menu-local:hover { background-color: #5d4037; }
+        #menu-online {
+            background-color: #1e3a8a;
+            color: white;
+            border: 1px solid #1e40af;
+        }
+        #menu-online:hover { background-color: #1e40af; }
+        
+        /* オンライン時のステータス表示 */
+        #online-status {
+            display: none;
+            width: 100%;
+            text-align: center;
+            background-color: #1e3a8a;
+            color: white;
+            font-weight: bold;
+            padding: 4px;
+            font-size: 14px;
+        }
+
     </style>
 </head>
-<body class="flex flex-col lg:flex-row justify-center items-center lg:items-start py-4 w-full px-2 gap-8 mx-auto max-w-5xl">
+<body class="flex flex-col lg:flex-row justify-center items-center lg:items-start py-10 w-full px-2 gap-8 mx-auto max-w-5xl">
+
+    <!-- トップメニュー -->
+    <div id="top-menu">
+        <button id="menu-local" class="menu-btn">2人対戦(オフライン)</button>
+        <button id="menu-online" class="menu-btn">オンライン対戦</button>
+    </div>
+
+    <!-- オンラインステータス -->
+    <div id="online-status" class="fixed top-0 left-0 z-40 shadow">
+        オンライン対戦ルーム: <span id="room-code-display">---</span> | あなたは: <span id="my-role-display">---</span>
+    </div>
 
     <!-- 時計・設定パネル -->
-    <div class="flex flex-col gap-4 w-full max-w-xs bg-[#e3ded6] p-4 rounded-lg shadow-lg border-2 border-[#5d4037] shrink-0">
+    <div class="flex flex-col gap-4 w-full max-w-xs bg-[#e3ded6] p-4 rounded-lg shadow-lg border-2 border-[#5d4037] shrink-0 mt-8 lg:mt-0">
         <div id="opponent-clock-box" class="flex flex-col items-center p-3 border-4 border-transparent bg-white rounded shadow transition-colors rotate-180">
             <div class="text-sm font-bold text-gray-600 mb-1">後手</div>
             <div id="opponent-time" class="text-3xl font-mono tracking-wider font-bold text-gray-800">10:00</div>
@@ -350,7 +361,7 @@
                 <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-t border-[#5d4037]/50 pt-1 block rotate-180">後手の駒台</div>
                 <div id="opponent-hand" class="hand-area flex flex-wrap gap-1"></div>
             </div>
-            <button onclick="showCardHelp(OPPONENT)" class="mt-1 w-6 h-6 bg-[#6e462e] text-[#ebd1ba] rounded-full font-bold shadow-[1px_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#5d4037] hover:scale-110 transition flex-shrink-0 flex items-center justify-center text-sm rotate-180" title="カードの効果を見る">?</button>
+            <button onclick="window.showCardHelp(1)" class="mt-1 w-6 h-6 bg-[#6e462e] text-[#ebd1ba] rounded-full font-bold shadow-[1px_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#5d4037] hover:scale-110 transition flex-shrink-0 flex items-center justify-center text-sm rotate-180" title="カードの効果を見る">?</button>
         </div>
         <!-- 右上：ラベルとカード -->
         <div class="flex flex-col items-end flex-1 pl-2">
@@ -376,7 +387,7 @@
                     <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">先手の駒台</div>
                     <div id="player-hand" class="hand-area flex flex-wrap gap-1"></div>
                 </div>
-                <button onclick="showCardHelp(PLAYER)" class="mb-1 w-6 h-6 bg-[#6e462e] text-[#ebd1ba] rounded-full font-bold shadow-[1px_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#5d4037] hover:scale-110 transition flex-shrink-0 flex items-center justify-center text-sm" title="カードの効果を見る">?</button>
+                <button onclick="window.showCardHelp(0)" class="mb-1 w-6 h-6 bg-[#6e462e] text-[#ebd1ba] rounded-full font-bold shadow-[1px_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#5d4037] hover:scale-110 transition flex-shrink-0 flex items-center justify-center text-sm" title="カードの効果を見る">?</button>
             </div>
         </div>
     </div>
@@ -389,29 +400,37 @@
     <!-- メッセージモーダル -->
     <div id="modal-overlay">
         <div id="modal-content" class="flex flex-col items-center">
-            <p id="modal-message" class="text-lg font-bold mb-4"></p>
-            <div id="modal-buttons" class="flex gap-4">
+            <h3 id="modal-title" class="text-lg font-bold mb-2"></h3>
+            <p id="modal-message" class="text-md mb-4"></p>
+            <div id="modal-input-container" class="w-full hidden">
+                <input type="text" id="modal-input" class="modal-input" maxlength="5" placeholder="5文字のコード">
+            </div>
+            <div id="modal-buttons" class="flex gap-4 mt-2">
                 <!-- ボタンが動的に追加されます -->
             </div>
         </div>
     </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 // --- 定数定義 ---
 const PLAYER = 0; // 先手 (下側)
 const OPPONENT = 1; // 後手 (上側)
 
 // 駒の種類
 const EMPTY = 0;
-const PAWN = 1;   // 歩
-const LANCE = 2;  // 香
-const KNIGHT = 3; // 桂
-const SILVER = 4; // 銀
-const GOLD = 5;   // 金
-const BISHOP = 6; // 角
-const ROOK = 7;   // 飛
-const KING = 8;   // 玉/王
-const WALL = 99;  // 障害物(カード効果)
+const PAWN = 1;
+const LANCE = 2;
+const KNIGHT = 3;
+const SILVER = 4;
+const GOLD = 5;
+const BISHOP = 6;
+const ROOK = 7;
+const KING = 8;
+const WALL = 99;
 
 // カード効果
 const CARD_STEAL = '強奪';
@@ -421,17 +440,41 @@ const CARD_SHIELD = '盾';
 const CARD_IDATEN = '韋駄天';
 const CARD_TYPES = [CARD_STEAL, CARD_WALL, CARD_FREEZE, CARD_SHIELD, CARD_IDATEN];
 
-// 駒の文字と成り文字
 const pieceStrs = {
-    [PAWN]: ['歩', 'と'],
-    [LANCE]: ['香', '杏'],
-    [KNIGHT]: ['桂', '圭'],
-    [SILVER]: ['銀', '全'],
-    [GOLD]: ['金', ''],
-    [BISHOP]: ['角', '馬'],
-    [ROOK]: ['飛', '龍'],
-    [KING]: ['玉', '']
+    [PAWN]: ['歩', 'と'], [LANCE]: ['香', '杏'], [KNIGHT]: ['桂', '圭'],
+    [SILVER]: ['銀', '全'], [GOLD]: ['金', ''], [BISHOP]: ['角', '馬'],
+    [ROOK]: ['飛', '龍'], [KING]: ['玉', '']
 };
+
+// --- Firebase連携 ---
+let db = null;
+let auth = null;
+let currentUser = null;
+let isFirebaseReady = false;
+
+async function initFirebase() {
+    if (typeof __firebase_config === 'undefined' || typeof __app_id === 'undefined') {
+        console.warn("Firebase 設定が見つかりません。オフラインモードのみ動作します。");
+        return false;
+    }
+    try {
+        const app = initializeApp(JSON.parse(__firebase_config));
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+        currentUser = auth.currentUser;
+        isFirebaseReady = true;
+        return true;
+    } catch (e) {
+        console.error("Firebase 初期化エラー:", e);
+        return false;
+    }
+}
 
 // --- 対局時計 ---
 class Clock {
@@ -473,7 +516,6 @@ class Clock {
 
     switchTurn(newTurn) {
         if (!this.active) return;
-        // ターン終了時に秒読みをリセット
         this.currentByoyomi[this.turn] = this.byoyomiSec;
         this.turn = newTurn;
         this.render();
@@ -541,17 +583,12 @@ class Clock {
 class Game {
     constructor() {
         this.clock = new Clock((player) => this.handleTimeUp(player));
-        this.board = Array.from({length: 9}, () => Array(9).fill(null));
-        this.hands = { [PLAYER]: [], [OPPONENT]: [] };
-        this.turn = PLAYER;
-        this.selected = null; // {type: 'board', x, y} or {type: 'hand', pieceType}
-        this.legalMoves = [];
-        this.lastMove = null;
-        this.isGameOver = false;
-        this.hasStarted = false;
+        this.isOnline = false;
+        this.roomId = null;
+        this.myRole = null;
+        this.unsubscribe = null;
         
         this.initBoard();
-        this.render();
     }
 
     handleTimeUp(player) {
@@ -561,10 +598,11 @@ class Game {
         let msg = `時間切れにより、${winner}の勝ちです！`;
         this.updateMessage(msg);
         this.render();
-        showModal(msg, [{text: "閉じる", onClick: hideModal}]);
+        window.showModal(msg, "", [{text: "閉じる", onClick: window.hideModal}]);
+        this.syncState();
     }
 
-    initBoard() {
+    initBoard(sync = true) {
         this.board = Array.from({length: 9}, () => Array(9).fill(null));
         this.hands = { [PLAYER]: [], [OPPONENT]: [] };
         this.turn = PLAYER;
@@ -573,12 +611,10 @@ class Game {
         this.lastMove = null;
         this.isGameOver = false;
         this.hasStarted = false;
-        this.clock.reset();
-        
-        // カードシステム用
         this.moveCount = 0;
         this.cards = { [PLAYER]: [], [OPPONENT]: [] };
-        this.targetingCard = null; // { card: 'CARD_NAME', player: PLAYER, index: 0 }
+        this.targetingCard = null;
+        this.clock.reset();
 
         const initialLayout = [
             [{t:LANCE, o:1}, {t:KNIGHT, o:1}, {t:SILVER, o:1}, {t:GOLD, o:1}, {t:KING, o:1}, {t:GOLD, o:1}, {t:SILVER, o:1}, {t:KNIGHT, o:1}, {t:LANCE, o:1}],
@@ -604,29 +640,196 @@ class Game {
             }
         }
         this.updateMessage("先手の番です");
+        this.render();
+        
+        if (sync && this.isOnline) {
+            this.syncState();
+        }
     }
 
-    // 指定位置の駒を取得
+    // -- オンライン関連 --
+    async createRoom() {
+        if (!isFirebaseReady) return;
+        this.roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+        this.isOnline = true;
+        
+        const roomRef = doc(db, 'artifacts', __app_id, 'public', 'data', 'rooms', this.roomId);
+        await setDoc(roomRef, {
+            status: 'waiting',
+            host: currentUser.uid,
+            guest: null,
+            roles: {},
+            gameState: null,
+            lastUpdateUserId: currentUser.uid,
+            createdAt: new Date().getTime()
+        });
+        
+        this.listenToRoom();
+        document.getElementById('online-status').style.display = 'block';
+        document.getElementById('room-code-display').innerText = this.roomId;
+        document.getElementById('my-role-display').innerText = '待機中...';
+        
+        window.showModal("部屋を作成しました", `他のプレイヤーにこのコードを教えてください: <br><strong class="text-2xl">${this.roomId}</strong><br>対戦相手を待っています...`, [
+            {text: "キャンセル", onClick: () => { window.hideModal(); this.exitOnline(); }}
+        ]);
+    }
+
+    async joinRoom(code) {
+        if (!isFirebaseReady) return;
+        const roomRef = doc(db, 'artifacts', __app_id, 'public', 'data', 'rooms', code);
+        const docSnap = await getDoc(roomRef);
+        
+        if (docSnap.exists() && docSnap.data().status === 'waiting') {
+            this.roomId = code;
+            this.isOnline = true;
+            
+            // 役割をランダムに決定
+            const hostRole = Math.random() < 0.5 ? PLAYER : OPPONENT;
+            const guestRole = hostRole === PLAYER ? OPPONENT : PLAYER;
+            
+            await updateDoc(roomRef, {
+                status: 'playing',
+                guest: currentUser.uid,
+                roles: {
+                    [docSnap.data().host]: hostRole,
+                    [currentUser.uid]: guestRole
+                }
+            });
+            this.listenToRoom();
+            document.getElementById('online-status').style.display = 'block';
+            document.getElementById('room-code-display').innerText = this.roomId;
+            window.hideModal();
+        } else {
+            window.showModal("エラー", "部屋が見つからないか、既に対戦中です。", [{text: "閉じる", onClick: window.hideModal}]);
+        }
+    }
+
+    listenToRoom() {
+        if (this.unsubscribe) this.unsubscribe();
+        const roomRef = doc(db, 'artifacts', __app_id, 'public', 'data', 'rooms', this.roomId);
+        
+        this.unsubscribe = onSnapshot(roomRef, (docSnap) => {
+            if (!docSnap.exists()) {
+                this.exitOnline();
+                window.showModal("切断", "部屋が解散されました。", [{text: "OK", onClick: window.hideModal}]);
+                return;
+            }
+            
+            const data = docSnap.data();
+            if (data.status === 'playing' && this.myRole === null) {
+                this.myRole = data.roles[currentUser.uid];
+                document.getElementById('my-role-display').innerText = (this.myRole === PLAYER ? '先手' : '後手');
+                window.hideModal();
+                
+                const roleStr = this.myRole === PLAYER ? '先手' : '後手';
+                window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「${roleStr}」です。`, [{text: "対局開始", onClick: window.hideModal}]);
+                
+                if (this.myRole === OPPONENT) {
+                    // 盤面をひっくり返して表示する (簡易的にboardのcss対応等は現状のままで、後手視点UIの追加は今回は見送り。必要なら実装)
+                    // 本来は視点を反転させる実装が必要だが、現状は先手・後手で固定UI。
+                }
+
+                // ホストが初期状態を同期
+                if (data.host === currentUser.uid) {
+                    this.initBoard(true);
+                }
+            }
+            
+            if (data.gameState && data.lastUpdateUserId !== currentUser.uid) {
+                this.loadState(data.gameState);
+            }
+        }, (error) => {
+            console.error("Firestore Listen Error:", error);
+        });
+    }
+
+    async syncState() {
+        if (!this.isOnline || !this.roomId) return;
+        const state = {
+            board: this.board,
+            hands: this.hands,
+            turn: this.turn,
+            cards: this.cards,
+            clockTime: this.clock.time,
+            clockByoyomi: this.clock.inByoyomi,
+            clockCurrentByoyomi: this.clock.currentByoyomi,
+            lastMove: this.lastMove,
+            moveCount: this.moveCount,
+            isGameOver: this.isGameOver,
+            hasStarted: this.hasStarted
+        };
+        
+        const roomRef = doc(db, 'artifacts', __app_id, 'public', 'data', 'rooms', this.roomId);
+        try {
+            await updateDoc(roomRef, {
+                gameState: state,
+                lastUpdateUserId: currentUser.uid
+            });
+        } catch(e) {
+            console.error("Sync error:", e);
+        }
+    }
+
+    loadState(state) {
+        this.board = state.board;
+        this.hands = state.hands;
+        this.turn = state.turn;
+        this.cards = state.cards;
+        this.lastMove = state.lastMove;
+        this.moveCount = state.moveCount;
+        this.isGameOver = state.isGameOver;
+        
+        this.clock.time = state.clockTime;
+        this.clock.inByoyomi = state.clockByoyomi;
+        this.clock.currentByoyomi = state.clockCurrentByoyomi;
+        
+        if (state.hasStarted && !this.hasStarted) {
+            this.hasStarted = true;
+            this.clock.start();
+        } else if (state.isGameOver) {
+            this.clock.stop();
+        } else {
+            this.clock.switchTurn(this.turn);
+        }
+        
+        this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+        this.selected = null;
+        this.legalMoves = [];
+        this.targetingCard = null;
+        this.render();
+    }
+
+    exitOnline() {
+        this.isOnline = false;
+        this.roomId = null;
+        this.myRole = null;
+        if (this.unsubscribe) {
+            this.unsubscribe();
+            this.unsubscribe = null;
+        }
+        document.getElementById('online-status').style.display = 'none';
+        this.initBoard(false);
+    }
+    // -- /オンライン関連 --
+
+
     getPiece(x, y) {
         if (x < 0 || x > 8 || y < 0 || y > 8) return null;
         return this.board[y][x];
     }
 
-    // 移動可能かチェック（味方の駒がないか、盤内か）
     canMoveTo(x, y, owner) {
         if (x < 0 || x > 8 || y < 0 || y > 8) return false;
         const p = this.board[y][x];
-        if (p && p.type === WALL) return false; // 壁には進めない
-        if (p && p.owner !== owner && p.shielded) return false; // 盾持ちの敵は攻撃対象にできない
+        if (p && p.type === WALL) return false;
+        if (p && p.owner !== owner && p.shielded) return false;
         return p === null || p.owner !== owner;
     }
 
-    // 駒単体の理論上の移動可能範囲を返す (x, yの相対座標リスト)
-    // 戻り値: [{dx, dy, slide}] slide: 連続移動フラグ
     getPieceMovement(piece) {
         const type = piece.type;
         const p = piece.promoted;
-        const dir = piece.owner === PLAYER ? -1 : 1; // 先手は上(-1)、後手は下(+1)へ
+        const dir = piece.owner === PLAYER ? -1 : 1;
 
         if (type === KING) return [[-1,-1], [0,-1], [1,-1], [-1,0], [1,0], [-1,1], [0,1], [1,1]].map(d => ({dx: d[0], dy: d[1]}));
         if (type === GOLD || (p && [PAWN, LANCE, KNIGHT, SILVER].includes(type))) {
@@ -649,15 +852,13 @@ class Game {
         return moves;
     }
 
-    // 盤上の駒の可能な移動先を計算 (王手放置は考慮しない)
     getRawMoves(x, y) {
         const piece = this.board[y][x];
         if (!piece) return [];
-        if (piece.frozen) return []; // 氷結中は動けない
+        if (piece.frozen) return [];
 
         let movements = this.getPieceMovement(piece);
         
-        // 韋駄天効果: 1往復だけ飛車＋角の動き
         if (piece.idaten) {
             movements = [
                 {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
@@ -666,14 +867,13 @@ class Game {
         }
 
         let moves = [];
-
         for (const move of movements) {
             if (move.slide) {
                 let cx = x + move.dx;
                 let cy = y + move.dy;
                 while (this.canMoveTo(cx, cy, piece.owner)) {
                     moves.push({toX: cx, toY: cy});
-                    if (this.board[cy][cx] !== null) break; // 敵駒にぶつかったらストップ
+                    if (this.board[cy][cx] !== null) break;
                     cx += move.dx;
                     cy += move.dy;
                 }
@@ -688,10 +888,8 @@ class Game {
         return moves;
     }
 
-    // 王手されているかチェック
     isInCheck(player) {
         let kingX = -1, kingY = -1;
-        // 王を探す
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const p = this.board[y][x];
@@ -702,10 +900,9 @@ class Game {
             }
             if(kingX !== -1) break;
         }
-        if (kingX === -1) return true; // 王がいない＝取られた(基本ありえないが)
+        if (kingX === -1) return true;
 
         const opponent = player === PLAYER ? OPPONENT : PLAYER;
-        // 敵のすべての駒の効きをチェック
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const p = this.board[y][x];
@@ -720,12 +917,7 @@ class Game {
         return false;
     }
 
-    // 仮想的に手を指してみて、王手放置にならないかチェック
     testMoveUnchecks(from, to, player) {
-        // from: {x,y} (盤上) or {type} (持ち駒)
-        // to: {x,y}
-        
-        // バックアップ
         const toPiece = this.board[to.y][to.x];
         let fromPiece = null;
         
@@ -734,14 +926,12 @@ class Game {
             this.board[to.y][to.x] = fromPiece;
             this.board[from.y][from.x] = null;
         } else {
-            // 持ち駒を打つ
             fromPiece = { type: from.type, owner: player, promoted: false };
             this.board[to.y][to.x] = fromPiece;
         }
 
         const isSafe = !this.isInCheck(player);
 
-        // 復元
         if (from.x !== undefined) {
             this.board[from.y][from.x] = fromPiece;
             this.board[to.y][to.x] = toPiece;
@@ -752,7 +942,6 @@ class Game {
         return isSafe;
     }
 
-    // 二歩チェック
     isNifu(x, player) {
         for (let y = 0; y < 9; y++) {
             const p = this.board[y][x];
@@ -763,7 +952,6 @@ class Game {
         return false;
     }
 
-    // 行き所のない駒チェック (打つ時用)
     hasNoPlaceToGo(type, y, player) {
         if (player === PLAYER) {
             if (type === PAWN || type === LANCE) return y === 0;
@@ -775,19 +963,15 @@ class Game {
         return false;
     }
 
-    // あるプレイヤーのすべての合法手を取得
     getAllLegalMoves(player) {
         let allMoves = [];
         
-        // 盤上の駒の移動
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const p = this.board[y][x];
                 if (p && p.owner === player) {
                     const rawMoves = this.getRawMoves(x, y);
                     for (const m of rawMoves) {
-                        // 行き所のない駒になる移動(不成りの場合)は不可だが、成れば動ける場合がある。
-                        // ただし、強制成りの判定は指した後に起こるので、ここでは王手回避のみチェック
                         if (this.testMoveUnchecks({x, y}, {x: m.toX, y: m.toY}, player)) {
                             allMoves.push({from: {x,y}, to: {x: m.toX, y: m.toY}});
                         }
@@ -796,23 +980,16 @@ class Game {
             }
         }
 
-        // 持ち駒を打つ
         const uniqueHands = [...new Set(this.hands[player])];
         for (const type of uniqueHands) {
             for (let y = 0; y < 9; y++) {
                 for (let x = 0; x < 9; x++) {
                     if (this.board[y][x] === null) {
-                        // 二歩チェック
                         if (type === PAWN && this.isNifu(x, player)) continue;
-                        // 行き所のない駒
                         if (this.hasNoPlaceToGo(type, y, player)) continue;
                         
-                        // 王手回避チェック
                         if (this.testMoveUnchecks({type: type}, {x, y}, player)) {
-                            // 打ち歩詰めのチェック (歩を打つ場合のみ)
-                            if (type === PAWN) {
-                                if (this.isUchifuZume(x, y, player)) continue;
-                            }
+                            if (type === PAWN && this.isUchifuZume(x, y, player)) continue;
                             allMoves.push({from: {type: type}, to: {x, y}});
                         }
                     }
@@ -822,43 +999,39 @@ class Game {
         return allMoves;
     }
 
-    // 打ち歩詰め判定: 仮想的に歩を打ち、敵が詰み状態か確認する
     isUchifuZume(x, y, player) {
-        // 仮置き
         this.board[y][x] = { type: PAWN, owner: player, promoted: false };
         const opponent = player === PLAYER ? OPPONENT : PLAYER;
-        
         let isMate = false;
-        // 歩を打って王手になっているか？
         if (this.isInCheck(opponent)) {
-            // 敵に合法手がないか？
             const opMoves = this.getAllLegalMoves(opponent);
             if (opMoves.length === 0) {
-                isMate = true; // 打ち歩詰め
+                isMate = true;
             }
         }
-        // 元に戻す
         this.board[y][x] = null;
-        
         return isMate;
     }
 
-    // マスクリック時の処理
     handleClick(type, x, y, pieceType = null, cardIndex = null) {
         if (this.isGameOver) return;
+        
+        // オンラインモードで自分の番でない場合は操作を無効化
+        if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) {
+            return;
+        }
 
         if (!this.hasStarted) {
             this.hasStarted = true;
             this.clock.start();
+            if(this.isOnline) this.syncState();
         }
 
-        // カードクリック時の処理
         if (type === 'card') {
             const player = pieceType;
             if (player === this.turn && !this.targetingCard) {
                 this.useCard(player, cardIndex);
             } else if (this.targetingCard && player === this.turn && cardIndex === this.targetingCard.index) {
-                // 同じカードをクリックでキャンセル
                 this.targetingCard = null;
                 this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
                 this.render();
@@ -866,7 +1039,6 @@ class Game {
             return;
         }
 
-        // カードの対象選択中
         if (this.targetingCard && type === 'board') {
             this.resolveCardTarget(x, y);
             return;
@@ -875,26 +1047,21 @@ class Game {
         if (type === 'board') {
             const clickedPiece = this.board[y][x];
 
-            // 駒が選択されていない場合、自分の駒を選択
             if (!this.selected) {
                 if (clickedPiece && clickedPiece.owner === this.turn) {
                     this.selected = { type: 'board', x, y };
                     this.calcLegalMovesForSelected();
                 }
             } 
-            // 既に選択されている場合
             else {
-                // 移動先として選択
                 const isLegalMove = this.legalMoves.find(m => m.toX === x && m.toY === y);
                 if (isLegalMove) {
                     this.executeMove(this.selected, {x, y});
                 } 
-                // 自分の別の駒をクリックしたら選択切り替え
                 else if (clickedPiece && clickedPiece.owner === this.turn) {
                     this.selected = { type: 'board', x, y };
                     this.calcLegalMovesForSelected();
                 } 
-                // キャンセル
                 else {
                     this.selected = null;
                     this.legalMoves = [];
@@ -902,8 +1069,19 @@ class Game {
                 }
             }
         } else if (type === 'hand') {
-            // 持ち駒の選択
-            this.selected = { type: 'hand', pieceType };
+            if (this.turn === pieceType) { // pieceTypeにplayerを入れている実装だったため
+                this.selected = { type: 'hand', pieceType }; // 本来ここpieceTypeには駒の種類を入れる。修正必要。
+                // 修正: this.handsのクリックイベントに注意
+            }
+        }
+    }
+    
+    // Hand click用（引数整理版）
+    handleHandClick(player, type) {
+        if (this.isGameOver) return;
+        if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) return;
+        if (this.turn === player) {
+            this.selected = { type: 'hand', pieceType: type };
             this.calcLegalMovesForSelected();
         }
     }
@@ -912,10 +1090,9 @@ class Game {
         const card = this.cards[player][cardIndex];
         if (card === CARD_STEAL) {
             const opp = player === PLAYER ? OPPONENT : PLAYER;
-            
             if (this.hands[opp].length === 0) {
                 this.updateMessage("相手の持駒がないため「強奪」は使用できません");
-                return; // 処理を中断（カード・ターンの消費なし）
+                return;
             }
 
             let msg = "";
@@ -926,9 +1103,8 @@ class Game {
             
             this.cards[player].splice(cardIndex, 1);
             this.render();
-            showModal(msg, [{text: "確認", onClick: () => { hideModal(); this.endTurn(); }}]);
+            window.showModal(msg, "", [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
         } else {
-            // 対象の選択が必要なカード
             this.targetingCard = { card, player, index: cardIndex };
             this.selected = null;
             this.legalMoves = [];
@@ -937,7 +1113,7 @@ class Game {
             if (card === CARD_WALL) msg = "壁を設置する空きマスを選択してください";
             if (card === CARD_FREEZE) msg = "氷結させる敵の駒を選択してください";
             if (card === CARD_SHIELD) msg = "盾を付与する味方の駒を選択してください";
-            if (card === CARD_IDATEN) msg = "韋駄天(飛+角移動)にする味方の駒を選択してください";
+            if (card === CARD_IDATEN) msg = "韋駄天にする味方の駒を選択してください";
             
             this.updateMessage(msg);
             this.render();
@@ -952,22 +1128,22 @@ class Game {
 
         if (card === CARD_WALL) {
             if (!targetPiece) {
-                this.board[y][x] = { type: WALL, owner: -1, duration: 4 }; // 両者のターンで減少し、2往復で消滅
+                this.board[y][x] = { type: WALL, owner: -1, duration: 4 };
                 success = true;
             }
         } else if (card === CARD_FREEZE) {
             if (targetPiece && targetPiece.owner !== player && targetPiece.type !== WALL) {
-                targetPiece.frozen = 2; // 相手のターンが終わるまで
+                targetPiece.frozen = 2;
                 success = true;
             }
         } else if (card === CARD_SHIELD) {
             if (targetPiece && targetPiece.owner === player) {
-                targetPiece.shielded = 2; // 1往復分持続
+                targetPiece.shielded = 2;
                 success = true;
             }
         } else if (card === CARD_IDATEN) {
             if (targetPiece && targetPiece.owner === player) {
-                targetPiece.idaten = 2; // 1往復分持続
+                targetPiece.idaten = 2;
                 success = true;
             }
         }
@@ -976,7 +1152,7 @@ class Game {
             this.cards[player].splice(this.targetingCard.index, 1);
             this.targetingCard = null;
             this.render();
-            showModal(`${card}を発動しました！`, [{text: "確認", onClick: () => { hideModal(); this.endTurn(); }}]);
+            window.showModal("カード発動", `${card}を発動しました！`, [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
         } else {
             this.updateMessage("対象が不正です。もう一度選ぶかカードを押してキャンセル");
         }
@@ -1003,7 +1179,6 @@ class Game {
         this.render();
     }
 
-    // 陣地判定 (成り条件)
     isEnemyTerritory(y, player) {
         return player === PLAYER ? y <= 2 : y >= 6;
     }
@@ -1017,17 +1192,14 @@ class Game {
             movedPiece = this.board[from.y][from.x];
             const targetPiece = this.board[to.y][to.x];
 
-            // 駒を取る
             if (targetPiece) {
                 let capturedType = targetPiece.type;
                 this.hands[this.turn].push(capturedType);
             }
 
-            // 移動
             this.board[from.y][from.x] = null;
             this.board[to.y][to.x] = movedPiece;
 
-            // 成りの判定
             if (!movedPiece.promoted && movedPiece.type !== KING && movedPiece.type !== GOLD) {
                 const enteredEnemy = this.isEnemyTerritory(to.y, this.turn) || this.isEnemyTerritory(from.y, this.turn);
                 if (enteredEnemy) {
@@ -1040,7 +1212,6 @@ class Game {
             }
 
         } else if (from.type === 'hand') {
-            // 持ち駒から消費
             const index = this.hands[this.turn].indexOf(from.pieceType);
             if (index > -1) {
                 this.hands[this.turn].splice(index, 1);
@@ -1064,14 +1235,13 @@ class Game {
     }
 
     showPromoteModal(piece, to) {
-        showModal("成りますか？", [
-            { text: "成る", onClick: () => { piece.promoted = true; hideModal(); this.endTurn(); } },
-            { text: "成らない", onClick: () => { hideModal(); this.endTurn(); } }
+        window.showModal("成りますか？", "", [
+            { text: "成る", onClick: () => { piece.promoted = true; window.hideModal(); this.endTurn(); } },
+            { text: "成らない", onClick: () => { window.hideModal(); this.endTurn(); } }
         ]);
     }
 
     endTurn() {
-        // 効果のターン消費
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 let p = this.board[y][x];
@@ -1096,10 +1266,8 @@ class Game {
             }
         }
 
-        // 次のプレイヤーへ
         const nextPlayer = this.turn === PLAYER ? OPPONENT : PLAYER;
         
-        // 詰み判定
         const nextMoves = this.getAllLegalMoves(nextPlayer);
         if (nextMoves.length === 0) {
             this.clock.stop();
@@ -1108,11 +1276,11 @@ class Game {
             this.updateMessage(msg);
             this.isGameOver = true;
             this.render();
-            showModal(msg, [{text: "閉じる", onClick: hideModal}]);
+            window.showModal("決着", msg, [{text: "閉じる", onClick: window.hideModal}]);
+            this.syncState();
             return;
         }
 
-        // カード支給 (先手後手合わせて10手ごと)
         this.moveCount++;
         let modalTriggered = false;
         if (this.moveCount % 10 === 0) {
@@ -1121,7 +1289,6 @@ class Game {
             modalTriggered = true;
         }
 
-        // 王手メッセージ
         if (this.isInCheck(nextPlayer)) {
             this.updateMessage("王手！");
         } else if (!this.targetingCard) {
@@ -1133,7 +1300,11 @@ class Game {
         this.render();
 
         if (modalTriggered) {
-            showModal("📜 計10手経過！両者に特殊カード支給！", [{text: "確認", onClick: hideModal}]);
+            window.showModal("カード支給", "📜 計10手経過！両者に特殊カード支給！", [{text: "確認", onClick: window.hideModal}]);
+        }
+
+        if (this.isOnline) {
+            this.syncState();
         }
     }
 
@@ -1145,14 +1316,12 @@ class Game {
         const boardEl = document.getElementById('board');
         boardEl.innerHTML = '';
 
-        // 盤面描画
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.onclick = () => this.handleClick('board', x, y);
 
-                // 背景色（ハイライト・選択など）
                 if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) {
                     cell.classList.add('selected');
                 }
@@ -1163,7 +1332,6 @@ class Game {
                     cell.classList.add('highlight');
                 }
 
-                // 状態異常などのクラス追加
                 const piece = this.board[y][x];
                 if (piece) {
                     if (piece.shielded) cell.classList.add('shielded-cell');
@@ -1180,7 +1348,7 @@ class Game {
                         pieceEl.classList.add('wall');
                     } else {
                         let pStr = pieceStrs[piece.type][piece.promoted ? 1 : 0];
-                        if(piece.type === KING && piece.owner === OPPONENT) pStr = '王'; // 後手は王将
+                        if(piece.type === KING && piece.owner === OPPONENT) pStr = '王';
                         pieceEl.innerText = pStr;
                     }
                     cell.appendChild(pieceEl);
@@ -1190,11 +1358,8 @@ class Game {
             }
         }
 
-        // 持ち駒描画
         this.renderHand(PLAYER, 'player-hand');
         this.renderHand(OPPONENT, 'opponent-hand');
-        
-        // カード描画
         this.renderCards(PLAYER, 'player-cards');
         this.renderCards(OPPONENT, 'opponent-cards');
     }
@@ -1208,15 +1373,12 @@ class Game {
             cardEl.className = 'card';
             cardEl.innerText = card;
             
-            // 選択中のカードはハイライト
             if (this.targetingCard && this.targetingCard.player === player && this.targetingCard.index === idx) {
                 cardEl.classList.add('selected-card');
             }
             
             cardEl.onclick = () => {
-                if (this.turn === player) {
-                    this.handleClick('card', -1, -1, player, idx);
-                }
+                this.handleClick('card', -1, -1, player, idx);
             };
             
             container.appendChild(cardEl);
@@ -1227,13 +1389,10 @@ class Game {
         const container = document.getElementById(containerId);
         container.innerHTML = '';
         
-        // 種類ごとにカウント
         const counts = {};
         const displayOrder = [ROOK, BISHOP, GOLD, SILVER, KNIGHT, LANCE, PAWN];
         
-        this.hands[player].forEach(p => {
-            counts[p] = (counts[p] || 0) + 1;
-        });
+        this.hands[player].forEach(p => { counts[p] = (counts[p] || 0) + 1; });
 
         displayOrder.forEach(type => {
             if (counts[type]) {
@@ -1257,9 +1416,7 @@ class Game {
                 }
 
                 wrapper.onclick = () => {
-                    if (this.turn === player) {
-                        this.handleClick('hand', -1, -1, type);
-                    }
+                    this.handleHandClick(player, type);
                 };
 
                 container.appendChild(wrapper);
@@ -1268,16 +1425,27 @@ class Game {
     }
 }
 
-// モーダル管理
+// モーダル管理(グローバルアクセス可能に)
 const modalOverlay = document.getElementById('modal-overlay');
+const modalTitle = document.getElementById('modal-title');
 const modalMessage = document.getElementById('modal-message');
 const modalButtons = document.getElementById('modal-buttons');
 const modalContent = document.getElementById('modal-content');
+const modalInputContainer = document.getElementById('modal-input-container');
+const modalInput = document.getElementById('modal-input');
 
-function showModal(message, buttons, isOpponent = false) {
+window.showModal = function(title, message, buttons, isOpponent = false, showInput = false) {
+    modalTitle.innerHTML = title;
     modalMessage.innerHTML = message;
     modalButtons.innerHTML = '';
     
+    if (showInput) {
+        modalInputContainer.classList.remove('hidden');
+        modalInput.value = "";
+    } else {
+        modalInputContainer.classList.add('hidden');
+    }
+
     if (isOpponent) {
         modalContent.classList.add('rotate-180');
     } else {
@@ -1287,21 +1455,20 @@ function showModal(message, buttons, isOpponent = false) {
     buttons.forEach(b => {
         const btn = document.createElement('button');
         btn.innerText = b.text;
-        btn.className = "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition";
+        btn.className = "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex-1 font-bold";
         btn.onclick = b.onClick;
         modalButtons.appendChild(btn);
     });
     modalOverlay.style.display = 'flex';
 }
 
-function hideModal() {
+window.hideModal = function() {
     modalOverlay.style.display = 'none';
 }
 
-function showCardHelp(player = PLAYER) {
+window.showCardHelp = function(player = PLAYER) {
     const helpHTML = `
-        <div class="text-left text-sm space-y-3 text-[#4a3623] max-w-sm">
-            <h3 class="font-bold text-lg text-center mb-2 border-b border-[#5d4037] pb-1">特殊カードの効果</h3>
+        <div class="text-left text-sm space-y-3 text-[#4a3623] max-w-sm mt-2">
             <p><strong>【強奪】</strong><br>相手の持ち駒からランダムに1つ奪います。</p>
             <p><strong>【氷結】</strong><br>指定した敵の駒1つを、次の相手ターン終了時まで移動不可にします。</p>
             <p><strong>【盾】</strong><br>指定した味方の駒1つを、1ターンの間相手の攻撃対象から外します。</p>
@@ -1309,28 +1476,69 @@ function showCardHelp(player = PLAYER) {
             <p><strong>【壁設置】</strong><br>空きマスに移動・通過不可の「壁」を設置します（2巡で消滅）。</p>
         </div>
     `;
-    showModal(helpHTML, [{text: "閉じる", onClick: hideModal}], player === OPPONENT);
+    window.showModal("特殊カードの効果", helpHTML, [{text: "閉じる", onClick: window.hideModal}], player === OPPONENT);
 }
 
-// 初期化
 let game;
-window.onload = () => {
+window.onload = async () => {
+    await initFirebase();
     game = new Game();
+    
     document.getElementById('reset-btn').addEventListener('click', () => {
-        showModal("最初からやり直しますか？", [
-            { text: "はい", onClick: () => { game.initBoard(); game.render(); hideModal(); } },
-            { text: "いいえ", onClick: hideModal }
+        if (game.isOnline) {
+            window.showModal("確認", "オンライン対戦中はリセットできません。", [{text: "閉じる", onClick: window.hideModal}]);
+            return;
+        }
+        window.showModal("確認", "最初からやり直しますか？", [
+            { text: "はい", onClick: () => { game.initBoard(); window.hideModal(); } },
+            { text: "いいえ", onClick: window.hideModal }
         ]);
     });
     
     document.getElementById('apply-clock-btn').addEventListener('click', () => {
-        showModal("設定を適用して最初からやり直しますか？", [
-            { text: "はい", onClick: () => { game.initBoard(); game.render(); hideModal(); } },
-            { text: "いいえ", onClick: hideModal }
+        if (game.isOnline) {
+            window.showModal("確認", "オンライン対戦中は設定を変更できません。", [{text: "閉じる", onClick: window.hideModal}]);
+            return;
+        }
+        window.showModal("設定の適用", "設定を適用して最初からやり直しますか？", [
+            { text: "はい", onClick: () => { game.initBoard(); window.hideModal(); } },
+            { text: "いいえ", onClick: window.hideModal }
+        ]);
+    });
+
+    // メニューのイベント
+    document.getElementById('menu-local').addEventListener('click', () => {
+        if (game.isOnline) {
+            window.showModal("オフラインに切替", "オンライン対戦を終了してオフラインモードに戻りますか？", [
+                { text: "はい", onClick: () => { game.exitOnline(); window.hideModal(); } },
+                { text: "いいえ", onClick: window.hideModal }
+            ]);
+        }
+    });
+
+    document.getElementById('menu-online').addEventListener('click', () => {
+        if (!isFirebaseReady) {
+            window.showModal("エラー", "通信環境が準備されていません。", [{text: "OK", onClick: window.hideModal}]);
+            return;
+        }
+        window.showModal("オンライン対戦", "どのように始めますか？", [
+            { text: "部屋を作る", onClick: () => { window.hideModal(); game.createRoom(); } },
+            { text: "部屋に入る", onClick: () => {
+                window.showModal("部屋に参加", "5文字のコードを入力してください。", [
+                    { text: "入室", onClick: () => {
+                        const code = document.getElementById('modal-input').value.toUpperCase();
+                        if (code.length === 5) {
+                            game.joinRoom(code);
+                        } else {
+                            alert("5文字で入力してください。");
+                        }
+                    }},
+                    { text: "キャンセル", onClick: window.hideModal }
+                ], false, true);
+            }}
         ]);
     });
 };
-
 </script>
 </body>
 </html>
