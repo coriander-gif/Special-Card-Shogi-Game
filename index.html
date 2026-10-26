@@ -451,18 +451,24 @@ let db = null;
 let auth = null;
 let currentUser = null;
 let isFirebaseReady = false;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'shogi-game-app';
+let analytics = null;
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBcvkE1KUfkKiPYf3DdiyQh1D556068Nss",
+  authDomain: "special-card-shogi-game.firebaseapp.com",
+  projectId: "special-card-shogi-game",
+  storageBucket: "special-card-shogi-game.firebasestorage.app",
+  messagingSenderId: "292188538308",
+  appId: "1:292188538308:web:5fb0f4d287b5a135869091",
+  measurementId: "G-Y29EEPE412"
+};
+
+const appId = firebaseConfig.projectId;
 
 async function initFirebase() {
     try {
-        if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-            console.warn("Firebase設定がありません。オンライン機能は無効になります。");
-            isFirebaseReady = false;
-            return false;
-        }
-        
-        const config = JSON.parse(__firebase_config);
-        const app = initializeApp(config);
+        const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
         
@@ -476,7 +482,7 @@ async function initFirebase() {
         isFirebaseReady = !!currentUser;
         return true;
     } catch (e) {
-        console.warn("Firebase初期化に失敗しました。オンライン機能は無効になります:", e);
+        console.warn("Firebase初期化に失敗しました。ローカルタブ間通信モードになります:", e);
         isFirebaseReady = false;
         return false;
     }
@@ -593,6 +599,7 @@ class Game {
         this.roomId = null;
         this.myRole = null;
         this.unsubscribe = null;
+        this.bc = null; // BroadcastChannel用
         
         this.initBoard();
     }
@@ -655,13 +662,24 @@ class Game {
 
     // -- オンライン関連 --
     async createRoom() {
-        if (!isFirebaseReady || !currentUser) {
-            window.showModal("エラー", "通信環境が準備されていません。<br>オフラインモードをご利用ください。", [{text: "OK", onClick: window.hideModal}]);
-            return;
-        }
         this.roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
         this.isOnline = true;
         
+        if (!isFirebaseReady || !currentUser) {
+            // ローカルタブ間通信（BroadcastChannel）フォールバック
+            this.bc = new BroadcastChannel('shogi_room_' + this.roomId);
+            this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
+            
+            document.getElementById('online-status').style.display = 'block';
+            document.getElementById('room-code-display').innerText = this.roomId;
+            document.getElementById('my-role-display').innerText = '待機中...';
+            
+            window.showModal("部屋を作成しました", `他のプレイヤーにこのコードを教えてください: <br><strong class="text-2xl">${this.roomId}</strong><br>対戦相手を待っています...<br><span class="text-sm text-red-600">(※ローカルモード: 同じブラウザの別タブでのみ有効です)</span>`, [
+                {text: "キャンセル", onClick: () => { window.hideModal(); this.exitOnline(); }}
+            ]);
+            return;
+        }
+
         const uid = currentUser.uid;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
         try {
@@ -692,9 +710,26 @@ class Game {
 
     async joinRoom(code) {
         if (!isFirebaseReady || !currentUser) {
-            window.showModal("エラー", "通信環境が準備されていません。", [{text: "OK", onClick: window.hideModal}]);
+            // ローカルタブ間通信（BroadcastChannel）フォールバック
+            this.roomId = code;
+            this.isOnline = true;
+            this.myRole = OPPONENT;
+            
+            this.bc = new BroadcastChannel('shogi_room_' + this.roomId);
+            this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
+            
+            document.getElementById('online-status').style.display = 'block';
+            document.getElementById('room-code-display').innerText = this.roomId;
+            document.getElementById('my-role-display').innerText = '後手';
+            window.hideModal();
+            
+            window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「後手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
+            
+            // ホストに自分が参加したことを知らせる
+            this.bc.postMessage({ type: 'join' });
             return;
         }
+
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
         try {
             const docSnap = await getDoc(roomRef);
@@ -768,12 +803,51 @@ class Game {
         });
     }
 
-    async syncState() {
-        if (!this.isOnline || !this.roomId || !currentUser) return;
-        const uid = currentUser.uid;
+    handleLocalMessage(data) {
+        if (data.type === 'join' && this.myRole === null) {
+            // ホスト側がゲストの参加を受け取る
+            this.myRole = PLAYER;
+            document.getElementById('my-role-display').innerText = '先手';
+            window.hideModal();
+            window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「先手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
+            this.initBoard(true);
+        } else if (data.type === 'sync' && data.state) {
+            // 状態同期を受け取る
+            this.loadState(data.state);
+        }
+    }
+
+    loadState(state) {
+        this.board = state.board;
+        this.hands = state.hands;
+        this.turn = state.turn;
+        this.cards = state.cards;
+        this.clock.time = state.clockTime;
+        this.clock.inByoyomi = state.clockByoyomi;
+        this.clock.currentByoyomi = state.clockCurrentByoyomi;
+        this.lastMove = state.lastMove;
+        this.moveCount = state.moveCount;
+        this.isGameOver = state.isGameOver;
+        this.hasStarted = state.hasStarted;
         
-        // Firestoreでの二次元配列(nested arrays)保存エラーを回避するため文字列化する
-        const stateStr = JSON.stringify({
+        if (this.hasStarted) {
+            this.clock.start();
+        } else if (this.isGameOver) {
+            this.clock.stop();
+        }
+        this.clock.switchTurn(this.turn);
+        
+        this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+        this.selected = null;
+        this.legalMoves = [];
+        this.targetingCard = null;
+        this.render();
+    }
+
+    async syncState() {
+        if (!this.isOnline || !this.roomId) return;
+        
+        const stateObj = {
             board: this.board,
             hands: this.hands,
             turn: this.turn,
@@ -785,7 +859,17 @@ class Game {
             moveCount: this.moveCount,
             isGameOver: this.isGameOver,
             hasStarted: this.hasStarted
-        });
+        };
+
+        if (!isFirebaseReady || !currentUser) {
+            if (this.bc) {
+                this.bc.postMessage({ type: 'sync', state: stateObj });
+            }
+            return;
+        }
+
+        const uid = currentUser.uid;
+        const stateStr = JSON.stringify(stateObj);
         
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
         try {
@@ -798,35 +882,6 @@ class Game {
         }
     }
 
-    loadState(state) {
-        this.board = state.board;
-        this.hands = state.hands;
-        this.turn = state.turn;
-        this.cards = state.cards;
-        this.lastMove = state.lastMove;
-        this.moveCount = state.moveCount;
-        this.isGameOver = state.isGameOver;
-        
-        this.clock.time = state.clockTime;
-        this.clock.inByoyomi = state.clockByoyomi;
-        this.clock.currentByoyomi = state.clockCurrentByoyomi;
-        
-        if (state.hasStarted && !this.hasStarted) {
-            this.hasStarted = true;
-            this.clock.start();
-        } else if (state.isGameOver) {
-            this.clock.stop();
-        } else {
-            this.clock.switchTurn(this.turn);
-        }
-        
-        this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
-        this.selected = null;
-        this.legalMoves = [];
-        this.targetingCard = null;
-        this.render();
-    }
-
     exitOnline() {
         this.isOnline = false;
         this.roomId = null;
@@ -834,6 +889,10 @@ class Game {
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;
+        }
+        if (this.bc) {
+            this.bc.close();
+            this.bc = null;
         }
         document.getElementById('online-status').style.display = 'none';
         this.initBoard(false);
@@ -1536,10 +1595,6 @@ window.onload = async () => {
     });
 
     document.getElementById('menu-online').addEventListener('click', () => {
-        if (!isFirebaseReady || !currentUser) {
-            window.showModal("エラー", "通信環境が準備されていません。<br>プレビュー環境で実行してください。", [{text: "OK", onClick: window.hideModal}]);
-            return;
-        }
         window.showModal("オンライン対戦", "どのように始めますか？", [
             { text: "部屋を作る", onClick: () => { window.hideModal(); game.createRoom(); } },
             { text: "部屋に入る", onClick: () => {
