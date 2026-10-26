@@ -310,8 +310,39 @@
         }
     </style>
 </head>
-<body class="flex flex-col items-center py-4 w-full px-2 max-w-md mx-auto">
+<body class="flex flex-col lg:flex-row justify-center items-center lg:items-start py-4 w-full px-2 gap-8 mx-auto max-w-5xl">
 
+    <!-- 時計・設定パネル -->
+    <div class="flex flex-col gap-4 w-full max-w-xs bg-[#e3ded6] p-4 rounded-lg shadow-lg border-2 border-[#5d4037] shrink-0">
+        <h2 class="text-xl font-bold text-center border-b border-[#5d4037] pb-2 mb-2 text-[#4a3623]">対局時計</h2>
+        
+        <div class="flex flex-col gap-2 mb-4">
+            <div class="flex justify-between items-center text-sm font-bold text-[#4a3623]">
+                <label>持ち時間(分):</label>
+                <input type="number" id="setting-time" value="10" min="0" class="w-16 p-1 border rounded text-right bg-white/80">
+            </div>
+            <div class="flex justify-between items-center text-sm font-bold text-[#4a3623]">
+                <label>秒読み(秒):</label>
+                <input type="number" id="setting-byoyomi" value="30" min="0" class="w-16 p-1 border rounded text-right bg-white/80">
+            </div>
+            <button id="apply-clock-btn" class="mt-2 py-2 bg-stone-700 text-white text-sm font-bold border border-stone-500 rounded shadow hover:bg-stone-600 transition">設定を適用して最初から</button>
+        </div>
+
+        <div id="opponent-clock-box" class="flex flex-col items-center p-3 border-4 border-transparent bg-white rounded shadow transition-colors">
+            <div class="text-sm font-bold text-gray-600 mb-1">後手</div>
+            <div id="opponent-time" class="text-3xl font-mono tracking-wider font-bold text-gray-800">10:00</div>
+            <div id="opponent-byoyomi" class="text-sm h-5 font-bold mt-1 text-[#4a3623]"></div>
+        </div>
+
+        <div id="player-clock-box" class="flex flex-col items-center p-3 border-4 border-transparent bg-white rounded shadow transition-colors">
+            <div class="text-sm font-bold text-gray-600 mb-1">先手</div>
+            <div id="player-time" class="text-3xl font-mono tracking-wider font-bold text-gray-800">10:00</div>
+            <div id="player-byoyomi" class="text-sm h-5 font-bold mt-1 text-[#4a3623]"></div>
+        </div>
+    </div>
+
+    <!-- ゲームエリア -->
+    <div class="flex flex-col items-center w-full max-w-md shrink-0">
     <!-- 後手エリア -->
     <div class="w-full flex justify-between items-start mb-2">
         <!-- 左上：後手の駒台 -->
@@ -348,6 +379,7 @@
     <div id="message" class="text-xl font-bold mt-6 text-white bg-black/50 px-4 py-1 rounded">先手の番です</div>
     
     <button id="reset-btn" class="mt-4 px-6 py-2 bg-stone-700 text-white border border-stone-500 rounded shadow hover:bg-stone-600 transition">最初から</button>
+    </div>
 
     <!-- メッセージモーダル -->
     <div id="modal-overlay">
@@ -396,9 +428,114 @@ const pieceStrs = {
     [KING]: ['玉', '']
 };
 
+// --- 対局時計 ---
+class Clock {
+    constructor(onTimeUp) {
+        this.onTimeUp = onTimeUp;
+        this.timer = null;
+        this.readSettings();
+    }
+
+    readSettings() {
+        const timeInput = parseInt(document.getElementById('setting-time').value) || 0;
+        const byoyomiInput = parseInt(document.getElementById('setting-byoyomi').value) || 0;
+        this.initialSec = timeInput * 60;
+        this.byoyomiSec = byoyomiInput;
+    }
+
+    reset() {
+        this.readSettings();
+        this.time = { [PLAYER]: this.initialSec, [OPPONENT]: this.initialSec };
+        this.inByoyomi = { [PLAYER]: this.initialSec <= 0, [OPPONENT]: this.initialSec <= 0 };
+        this.currentByoyomi = { [PLAYER]: this.byoyomiSec, [OPPONENT]: this.byoyomiSec };
+        this.active = false;
+        this.turn = PLAYER;
+        if(this.timer) clearInterval(this.timer);
+        this.render();
+    }
+
+    start() {
+        if (this.active) return;
+        this.active = true;
+        this.timer = setInterval(() => this.tick(), 1000);
+        this.render();
+    }
+
+    stop() {
+        this.active = false;
+        if(this.timer) clearInterval(this.timer);
+    }
+
+    switchTurn(newTurn) {
+        if (!this.active) return;
+        // ターン終了時に秒読みをリセット
+        this.currentByoyomi[this.turn] = this.byoyomiSec;
+        this.turn = newTurn;
+        this.render();
+    }
+
+    tick() {
+        if (!this.active) return;
+        
+        let p = this.turn;
+        if (!this.inByoyomi[p]) {
+            this.time[p]--;
+            if (this.time[p] <= 0) {
+                this.time[p] = 0;
+                this.inByoyomi[p] = true;
+            }
+        } else {
+            this.currentByoyomi[p]--;
+            if (this.currentByoyomi[p] < 0) {
+                this.stop();
+                this.onTimeUp(p);
+                return;
+            }
+        }
+        this.render();
+    }
+
+    formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    render() {
+        const updatePlayerUI = (player, timeElId, byoElId, boxId) => {
+            const timeEl = document.getElementById(timeElId);
+            const byoEl = document.getElementById(byoElId);
+            const boxEl = document.getElementById(boxId);
+            
+            if (timeEl) timeEl.innerText = this.formatTime(this.time[player]);
+            if (byoEl) {
+                if (this.inByoyomi[player]) {
+                    byoEl.innerText = `秒読み: ${this.currentByoyomi[player]}秒`;
+                    byoEl.style.color = (this.active && this.turn === player && this.currentByoyomi[player] <= 10) ? '#d13030' : '#4a3623';
+                } else {
+                    byoEl.innerText = '';
+                }
+            }
+            if (boxEl) {
+                if (this.active && this.turn === player) {
+                    boxEl.classList.add('border-[#f57f17]', 'bg-[#fff9c4]');
+                    boxEl.classList.remove('border-transparent', 'bg-white');
+                } else {
+                    boxEl.classList.remove('border-[#f57f17]', 'bg-[#fff9c4]');
+                    boxEl.classList.add('border-transparent', 'bg-white');
+                }
+            }
+        };
+
+        updatePlayerUI(PLAYER, 'player-time', 'player-byoyomi', 'player-clock-box');
+        updatePlayerUI(OPPONENT, 'opponent-time', 'opponent-byoyomi', 'opponent-clock-box');
+    }
+}
+
 // --- ゲームロジック ---
 class Game {
     constructor() {
+        this.clock = new Clock((player) => this.handleTimeUp(player));
         this.board = Array.from({length: 9}, () => Array(9).fill(null));
         this.hands = { [PLAYER]: [], [OPPONENT]: [] };
         this.turn = PLAYER;
@@ -406,9 +543,20 @@ class Game {
         this.legalMoves = [];
         this.lastMove = null;
         this.isGameOver = false;
+        this.hasStarted = false;
         
         this.initBoard();
         this.render();
+    }
+
+    handleTimeUp(player) {
+        this.isGameOver = true;
+        const loser = player === PLAYER ? "先手" : "後手";
+        const winner = player === PLAYER ? "後手" : "先手";
+        let msg = `時間切れにより、${winner}の勝ちです！`;
+        this.updateMessage(msg);
+        this.render();
+        showModal(msg, [{text: "閉じる", onClick: hideModal}]);
     }
 
     initBoard() {
@@ -419,6 +567,8 @@ class Game {
         this.legalMoves = [];
         this.lastMove = null;
         this.isGameOver = false;
+        this.hasStarted = false;
+        this.clock.reset();
         
         // カードシステム用
         this.moveCount = 0;
@@ -692,6 +842,11 @@ class Game {
     handleClick(type, x, y, pieceType = null, cardIndex = null) {
         if (this.isGameOver) return;
 
+        if (!this.hasStarted) {
+            this.hasStarted = true;
+            this.clock.start();
+        }
+
         // カードクリック時の処理
         if (type === 'card') {
             const player = pieceType;
@@ -942,6 +1097,7 @@ class Game {
         // 詰み判定
         const nextMoves = this.getAllLegalMoves(nextPlayer);
         if (nextMoves.length === 0) {
+            this.clock.stop();
             const winner = this.turn === PLAYER ? "先手" : "後手";
             let msg = `${winner}の勝ちです！(詰み)`;
             this.updateMessage(msg);
@@ -968,6 +1124,7 @@ class Game {
         }
 
         this.turn = nextPlayer;
+        this.clock.switchTurn(this.turn);
         this.render();
 
         if (modalTriggered) {
@@ -1134,6 +1291,13 @@ window.onload = () => {
     game = new Game();
     document.getElementById('reset-btn').addEventListener('click', () => {
         showModal("最初からやり直しますか？", [
+            { text: "はい", onClick: () => { game.initBoard(); game.render(); hideModal(); } },
+            { text: "いいえ", onClick: hideModal }
+        ]);
+    });
+    
+    document.getElementById('apply-clock-btn').addEventListener('click', () => {
+        showModal("設定を適用して最初からやり直しますか？", [
             { text: "はい", onClick: () => { game.initBoard(); game.render(); hideModal(); } },
             { text: "いいえ", onClick: hideModal }
         ]);
