@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&display=swap');
+        
+        body {
+            font-family: 'Shippori Mincho', serif;
+            background-color: #9c785c; /* 画像に合わせた背景の茶色 */
+            touch-action: manipulation;
+            color: #333;
+        }
+
+        #board {
+            background-color: #d6aa69; /* 将棋盤の木目色 */
+            border: 4px solid #5d4037;
+            box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
+            margin: 0 auto;
+        }
+
+        .cell {
+            width: 42px;
+            height: 48px;
+            border: 1px solid #7a583e; /* マスの線の色 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        @media (min-width: 600px) {
+            .cell {
+                width: 50px;
+                height: 56px;
+                font-size: 28px;
+            }
+        }
+
+        .piece {
+            width: 90%;
+            height: 95%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            /* SVGで将棋の駒の形を描画 */
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 75,30 90,105 10,105 25,30" fill="%23fdf4d6" stroke="%23333" stroke-width="4" stroke-linejoin="round"/></svg>');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-position: center;
+            padding-top: 10%; /* 駒の形に合わせて文字を少し下へ */
+            color: #111;
+            filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
+        }
+
+        .opponent-piece {
+            transform: rotate(180deg);
+        }
+
+        .promoted {
+            color: #d13030; /* 成り駒は赤色 */
+        }
+
+        .selected {
+            background-color: rgba(255, 255, 0, 0.4); /* 選択中のマス */
+        }
+
+        .highlight {
+            background-color: rgba(0, 255, 0, 0.2); /* 移動可能なマス */
+        }
+
+        #board {
+            background-color: #dcb35c; /* 将棋盤の色 */
+            border: 2px solid #333;
+            box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .cell {
+            width: 40px;
+            height: 44px;
+            border: 1px solid #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        @media (min-width: 600px) {
+            .cell {
+                width: 48px;
+                height: 52px;
+                font-size: 28px;
+            }
+        }
+
+        .piece {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        .opponent-piece {
+            transform: rotate(180deg);
+        }
+
+        .promoted {
+            color: #d13030; /* 成り駒は赤色 */
+        }
+
+        .selected {
+            background-color: rgba(255, 255, 0, 0.5); /* 選択中のマス */
+        }
+
+        .highlight {
+            background-color: rgba(0, 255, 0, 0.3); /* 移動可能なマス */
+        }
+        
+        .highlight::after {
+            content: '';
+            display: block;
+            width: 12px;
+            height: 12px;
+            background-color: rgba(0, 128, 0, 0.6);
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        .last-move {
+            background-color: rgba(255, 165, 0, 0.4);
+        }
+
+        .hand-area {
+            display: flex;
+            flex-wrap: wrap;
+            min-height: 50px;
+            padding: 4px;
+            background-color: transparent;
+            width: 100%;
+            gap: 4px;
+        }
+
+        .hand-piece {
+            width: 42px;
+            height: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 22px;
+            cursor: pointer;
+            user-select: none;
+            /* 持ち駒も駒の形にする */
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 75,30 90,105 10,105 25,30" fill="%23fdf4d6" stroke="%23333" stroke-width="4" stroke-linejoin="round"/></svg>');
+            background-size: 100% 100%;
+            padding-top: 10%;
+            font-weight: bold;
+            position: relative;
+            filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
+            transition: transform 0.1s;
+        }
+        .hand-piece:hover {
+            transform: translateY(-2px);
+        }
+        .hand-piece.selected {
+            filter: drop-shadow(0px 0px 4px yellow) brightness(1.1);
+        }
+        .hand-count {
+            font-size: 14px;
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #333;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .player-label {
+            background-color: #6e462e;
+            color: #ebd1ba;
+            padding: 8px 16px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 2px;
+            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.1), 1px 1px 3px rgba(0,0,0,0.4);
+            letter-spacing: 2px;
+        }
+
+        /* 追加: カードシステム用CSS */
+        .card-area {
+            display: flex;
+            flex-wrap: wrap;
+            min-height: 32px;
+            width: 100%;
+            max-width: 440px;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .card {
+            background: #fff;
+            border: 2px solid #555;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 1px 2px 4px rgba(0,0,0,0.2);
+            user-select: none;
+            transition: all 0.1s;
+        }
+        .card:hover {
+            background: #f0f0f0;
+            transform: translateY(-1px);
+        }
+        .card.selected-card {
+            background: #ffeb3b;
+            border-color: #e65100;
+        }
+        .wall {
+            background-color: #57534e;
+            color: white;
+            width: 100%;
+            height: 100%;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .shielded-cell::before {
+            content: '🛡️';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            font-size: 16px;
+            z-index: 10;
+        }
+        .frozen-cell::after {
+            content: '❄️';
+            position: absolute;
+            bottom: -8px;
+            left: -8px;
+            font-size: 16px;
+            z-index: 10;
+        }
+        .idaten-cell::before {
+            content: '💨';
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            font-size: 16px;
+            z-index: 10;
+        }
+
+        /* モーダル用 */
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+        }
+        #modal-content {
+            background: #fdf4d6;
+            padding: 20px;
+            border-radius: 4px;
+            border: 2px solid #5d4037;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center py-4 w-full px-2 max-w-md mx-auto">
+
+    <!-- 後手エリア -->
+    <div class="w-full flex justify-between items-start mb-2">
+        <div class="flex-1">
+            <div id="opponent-hand" class="hand-area justify-start"></div>
+            <div id="opponent-cards" class="card-area justify-start mt-2"></div>
+        </div>
+        <div class="player-label ml-2">後手</div>
+    </div>
+
+    <!-- 盤面 -->
+    <div id="board" class="grid grid-cols-9 grid-rows-9"></div>
+
+    <!-- 先手エリア -->
+    <div class="w-full flex justify-between items-end mt-4">
+        <div class="flex-1">
+            <div id="player-hand" class="hand-area justify-start"></div>
+            <div id="player-cards" class="card-area justify-start mt-2"></div>
+        </div>
+        <div class="player-label ml-2">先手</div>
+    </div>
+
+    <div id="message" class="text-xl font-bold mt-6 text-white bg-black/50 px-4 py-1 rounded">先手の番です</div>
+    
+    <button id="reset-btn" class="mt-4 px-6 py-2 bg-stone-700 text-white border border-stone-500 rounded shadow hover:bg-stone-600 transition">最初から</button>
+
+    <!-- メッセージモーダル -->
+    <div id="modal-overlay">
+        <div id="modal-content" class="flex flex-col items-center">
+            <p id="modal-message" class="text-lg font-bold mb-4"></p>
+            <div id="modal-buttons" class="flex gap-4">
+                <!-- ボタンが動的に追加されます -->
+            </div>
+        </div>
+    </div>
+
+<script>
+// --- 定数定義 ---
+const PLAYER = 0; // 先手 (下側)
+const OPPONENT = 1; // 後手 (上側)
+
+// 駒の種類
+const EMPTY = 0;
+const PAWN = 1;   // 歩
+const LANCE = 2;  // 香
+const KNIGHT = 3; // 桂
+const SILVER = 4; // 銀
+const GOLD = 5;   // 金
+const BISHOP = 6; // 角
+const ROOK = 7;   // 飛
+const KING = 8;   // 玉/王
+const WALL = 99;  // 障害物(カード効果)
+
+// カード効果
+const CARD_STEAL = '強奪';
+const CARD_WALL = '壁設置';
+const CARD_FREEZE = '氷結';
+const CARD_SHIELD = '盾';
+const CARD_IDATEN = '韋駄天';
+const CARD_TYPES = [CARD_STEAL, CARD_WALL, CARD_FREEZE, CARD_SHIELD, CARD_IDATEN];
+
+// 駒の文字と成り文字
+const pieceStrs = {
+    [PAWN]: ['歩', 'と'],
+    [LANCE]: ['香', '杏'],
+    [KNIGHT]: ['桂', '圭'],
+    [SILVER]: ['銀', '全'],
+    [GOLD]: ['金', ''],
+    [BISHOP]: ['角', '馬'],
+    [ROOK]: ['飛', '龍'],
+    [KING]: ['玉', '']
+};
+
+// --- ゲームロジック ---
+class Game {
+    constructor() {
+        this.board = Array.from({length: 9}, () => Array(9).fill(null));
+        this.hands = { [PLAYER]: [], [OPPONENT]: [] };
+        this.turn = PLAYER;
+        this.selected = null; // {type: 'board', x, y} or {type: 'hand', pieceType}
+        this.legalMoves = [];
+        this.lastMove = null;
+        this.isGameOver = false;
+        
+        this.initBoard();
+        this.render();
+    }
+
+    initBoard() {
+        this.board = Array.from({length: 9}, () => Array(9).fill(null));
+        this.hands = { [PLAYER]: [], [OPPONENT]: [] };
+        this.turn = PLAYER;
+        this.selected = null;
+        this.legalMoves = [];
+        this.lastMove = null;
+        this.isGameOver = false;
+        
+        // カードシステム用
+        this.moveCount = 0;
+        this.cards = { [PLAYER]: [], [OPPONENT]: [] };
+        this.targetingCard = null; // { card: 'CARD_NAME', player: PLAYER, index: 0 }
+
+        const initialLayout = [
+            [{t:LANCE, o:1}, {t:KNIGHT, o:1}, {t:SILVER, o:1}, {t:GOLD, o:1}, {t:KING, o:1}, {t:GOLD, o:1}, {t:SILVER, o:1}, {t:KNIGHT, o:1}, {t:LANCE, o:1}],
+            [null, {t:ROOK, o:1}, null, null, null, null, null, {t:BISHOP, o:1}, null],
+            [{t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}],
+            [null, null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null, null],
+            [{t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}],
+            [null, {t:BISHOP, o:0}, null, null, null, null, null, {t:ROOK, o:0}, null],
+            [{t:LANCE, o:0}, {t:KNIGHT, o:0}, {t:SILVER, o:0}, {t:GOLD, o:0}, {t:KING, o:0}, {t:GOLD, o:0}, {t:SILVER, o:0}, {t:KNIGHT, o:0}, {t:LANCE, o:0}]
+        ];
+
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                if (initialLayout[y][x]) {
+                    this.board[y][x] = {
+                        type: initialLayout[y][x].t,
+                        owner: initialLayout[y][x].o,
+                        promoted: false
+                    };
+                }
+            }
+        }
+        this.updateMessage("先手の番です");
+    }
+
+    // 指定位置の駒を取得
+    getPiece(x, y) {
+        if (x < 0 || x > 8 || y < 0 || y > 8) return null;
+        return this.board[y][x];
+    }
+
+    // 移動可能かチェック（味方の駒がないか、盤内か）
+    canMoveTo(x, y, owner) {
+        if (x < 0 || x > 8 || y < 0 || y > 8) return false;
+        const p = this.board[y][x];
+        if (p && p.type === WALL) return false; // 壁には進めない
+        if (p && p.owner !== owner && p.shielded) return false; // 盾持ちの敵は攻撃対象にできない
+        return p === null || p.owner !== owner;
+    }
+
+    // 駒単体の理論上の移動可能範囲を返す (x, yの相対座標リスト)
+    // 戻り値: [{dx, dy, slide}] slide: 連続移動フラグ
+    getPieceMovement(piece) {
+        const type = piece.type;
+        const p = piece.promoted;
+        const dir = piece.owner === PLAYER ? -1 : 1; // 先手は上(-1)、後手は下(+1)へ
+
+        if (type === KING) return [[-1,-1], [0,-1], [1,-1], [-1,0], [1,0], [-1,1], [0,1], [1,1]].map(d => ({dx: d[0], dy: d[1]}));
+        if (type === GOLD || (p && [PAWN, LANCE, KNIGHT, SILVER].includes(type))) {
+            return [[-1,dir], [0,dir], [1,dir], [-1,0], [1,0], [0,-dir]].map(d => ({dx: d[0], dy: d[1]}));
+        }
+        if (type === PAWN) return [{dx: 0, dy: dir}];
+        if (type === KNIGHT) return [{dx: -1, dy: dir*2}, {dx: 1, dy: dir*2}];
+        if (type === SILVER) return [[-1,dir], [0,dir], [1,dir], [-1,-dir], [1,-dir]].map(d => ({dx: d[0], dy: d[1]}));
+        if (type === LANCE) return [{dx: 0, dy: dir, slide: true}];
+        
+        let moves = [];
+        if (type === BISHOP || p) {
+            moves.push({dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true});
+            if (p) moves.push({dx:0, dy:-1}, {dx:0, dy:1}, {dx:-1, dy:0}, {dx:1, dy:0});
+        }
+        if (type === ROOK || p) {
+            moves.push({dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true});
+            if (p) moves.push({dx:-1, dy:-1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:1, dy:1});
+        }
+        return moves;
+    }
+
+    // 盤上の駒の可能な移動先を計算 (王手放置は考慮しない)
+    getRawMoves(x, y) {
+        const piece = this.board[y][x];
+        if (!piece) return [];
+        if (piece.frozen) return []; // 氷結中は動けない
+
+        let movements = this.getPieceMovement(piece);
+        
+        // 韋駄天効果: 1往復だけ飛車＋角の動き
+        if (piece.idaten) {
+            movements = [
+                {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
+                {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}
+            ];
+        }
+
+        let moves = [];
+
+        for (const move of movements) {
+            if (move.slide) {
+                let cx = x + move.dx;
+                let cy = y + move.dy;
+                while (this.canMoveTo(cx, cy, piece.owner)) {
+                    moves.push({toX: cx, toY: cy});
+                    if (this.board[cy][cx] !== null) break; // 敵駒にぶつかったらストップ
+                    cx += move.dx;
+                    cy += move.dy;
+                }
+            } else {
+                let cx = x + move.dx;
+                let cy = y + move.dy;
+                if (this.canMoveTo(cx, cy, piece.owner)) {
+                    moves.push({toX: cx, toY: cy});
+                }
+            }
+        }
+        return moves;
+    }
+
+    // 王手されているかチェック
+    isInCheck(player) {
+        let kingX = -1, kingY = -1;
+        // 王を探す
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.type === KING && p.owner === player) {
+                    kingX = x; kingY = y;
+                    break;
+                }
+            }
+            if(kingX !== -1) break;
+        }
+        if (kingX === -1) return true; // 王がいない＝取られた(基本ありえないが)
+
+        const opponent = player === PLAYER ? OPPONENT : PLAYER;
+        // 敵のすべての駒の効きをチェック
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === opponent) {
+                    const moves = this.getRawMoves(x, y);
+                    if (moves.some(m => m.toX === kingX && m.toY === kingY)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // 仮想的に手を指してみて、王手放置にならないかチェック
+    testMoveUnchecks(from, to, player) {
+        // from: {x,y} (盤上) or {type} (持ち駒)
+        // to: {x,y}
+        
+        // バックアップ
+        const toPiece = this.board[to.y][to.x];
+        let fromPiece = null;
+        
+        if (from.x !== undefined) {
+            fromPiece = this.board[from.y][from.x];
+            this.board[to.y][to.x] = fromPiece;
+            this.board[from.y][from.x] = null;
+        } else {
+            // 持ち駒を打つ
+            fromPiece = { type: from.type, owner: player, promoted: false };
+            this.board[to.y][to.x] = fromPiece;
+        }
+
+        const isSafe = !this.isInCheck(player);
+
+        // 復元
+        if (from.x !== undefined) {
+            this.board[from.y][from.x] = fromPiece;
+            this.board[to.y][to.x] = toPiece;
+        } else {
+            this.board[to.y][to.x] = null;
+        }
+
+        return isSafe;
+    }
+
+    // 二歩チェック
+    isNifu(x, player) {
+        for (let y = 0; y < 9; y++) {
+            const p = this.board[y][x];
+            if (p && p.type === PAWN && p.owner === player && !p.promoted) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 行き所のない駒チェック (打つ時用)
+    hasNoPlaceToGo(type, y, player) {
+        if (player === PLAYER) {
+            if (type === PAWN || type === LANCE) return y === 0;
+            if (type === KNIGHT) return y <= 1;
+        } else {
+            if (type === PAWN || type === LANCE) return y === 8;
+            if (type === KNIGHT) return y >= 7;
+        }
+        return false;
+    }
+
+    // あるプレイヤーのすべての合法手を取得
+    getAllLegalMoves(player) {
+        let allMoves = [];
+        
+        // 盤上の駒の移動
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === player) {
+                    const rawMoves = this.getRawMoves(x, y);
+                    for (const m of rawMoves) {
+                        // 行き所のない駒になる移動(不成りの場合)は不可だが、成れば動ける場合がある。
+                        // ただし、強制成りの判定は指した後に起こるので、ここでは王手回避のみチェック
+                        if (this.testMoveUnchecks({x, y}, {x: m.toX, y: m.toY}, player)) {
+                            allMoves.push({from: {x,y}, to: {x: m.toX, y: m.toY}});
+                        }
+                    }
+                }
+            }
+        }
+
+        // 持ち駒を打つ
+        const uniqueHands = [...new Set(this.hands[player])];
+        for (const type of uniqueHands) {
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        // 二歩チェック
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        // 行き所のない駒
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        
+                        // 王手回避チェック
+                        if (this.testMoveUnchecks({type: type}, {x, y}, player)) {
+                            // 打ち歩詰めのチェック (歩を打つ場合のみ)
+                            if (type === PAWN) {
+                                if (this.isUchifuZume(x, y, player)) continue;
+                            }
+                            allMoves.push({from: {type: type}, to: {x, y}});
+                        }
+                    }
+                }
+            }
+        }
+        return allMoves;
+    }
+
+    // 打ち歩詰め判定: 仮想的に歩を打ち、敵が詰み状態か確認する
+    isUchifuZume(x, y, player) {
+        // 仮置き
+        this.board[y][x] = { type: PAWN, owner: player, promoted: false };
+        const opponent = player === PLAYER ? OPPONENT : PLAYER;
+        
+        let isMate = false;
+        // 歩を打って王手になっているか？
+        if (this.isInCheck(opponent)) {
+            // 敵に合法手がないか？
+            const opMoves = this.getAllLegalMoves(opponent);
+            if (opMoves.length === 0) {
+                isMate = true; // 打ち歩詰め
+            }
+        }
+        // 元に戻す
+        this.board[y][x] = null;
+        
+        return isMate;
+    }
+
+    // マスクリック時の処理
+    handleClick(type, x, y, pieceType = null, cardIndex = null) {
+        if (this.isGameOver) return;
+
+        // カードクリック時の処理
+        if (type === 'card') {
+            const player = pieceType;
+            if (player === this.turn && !this.targetingCard) {
+                this.useCard(player, cardIndex);
+            } else if (this.targetingCard && player === this.turn && cardIndex === this.targetingCard.index) {
+                // 同じカードをクリックでキャンセル
+                this.targetingCard = null;
+                this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+                this.render();
+            }
+            return;
+        }
+
+        // カードの対象選択中
+        if (this.targetingCard && type === 'board') {
+            this.resolveCardTarget(x, y);
+            return;
+        }
+
+        if (type === 'board') {
+            const clickedPiece = this.board[y][x];
+
+            // 駒が選択されていない場合、自分の駒を選択
+            if (!this.selected) {
+                if (clickedPiece && clickedPiece.owner === this.turn) {
+                    this.selected = { type: 'board', x, y };
+                    this.calcLegalMovesForSelected();
+                }
+            } 
+            // 既に選択されている場合
+            else {
+                // 移動先として選択
+                const isLegalMove = this.legalMoves.find(m => m.toX === x && m.toY === y);
+                if (isLegalMove) {
+                    this.executeMove(this.selected, {x, y});
+                } 
+                // 自分の別の駒をクリックしたら選択切り替え
+                else if (clickedPiece && clickedPiece.owner === this.turn) {
+                    this.selected = { type: 'board', x, y };
+                    this.calcLegalMovesForSelected();
+                } 
+                // キャンセル
+                else {
+                    this.selected = null;
+                    this.legalMoves = [];
+                    this.render();
+                }
+            }
+        } else if (type === 'hand') {
+            // 持ち駒の選択
+            this.selected = { type: 'hand', pieceType };
+            this.calcLegalMovesForSelected();
+        }
+    }
+
+    useCard(player, cardIndex) {
+        const card = this.cards[player][cardIndex];
+        if (card === CARD_STEAL) {
+            const opp = player === PLAYER ? OPPONENT : PLAYER;
+            
+            if (this.hands[opp].length === 0) {
+                this.updateMessage("相手の持駒がないため「強奪」は使用できません");
+                return; // 処理を中断（カード・ターンの消費なし）
+            }
+
+            let msg = "";
+            const rIdx = Math.floor(Math.random() * this.hands[opp].length);
+            const stolen = this.hands[opp].splice(rIdx, 1)[0];
+            this.hands[player].push(stolen);
+            msg = `${card}発動！相手の駒を奪いました`;
+            
+            this.cards[player].splice(cardIndex, 1);
+            this.render();
+            showModal(msg, [{text: "確認", onClick: () => { hideModal(); this.endTurn(); }}]);
+        } else {
+            // 対象の選択が必要なカード
+            this.targetingCard = { card, player, index: cardIndex };
+            this.selected = null;
+            this.legalMoves = [];
+            
+            let msg = "";
+            if (card === CARD_WALL) msg = "壁を設置する空きマスを選択してください";
+            if (card === CARD_FREEZE) msg = "氷結させる敵の駒を選択してください";
+            if (card === CARD_SHIELD) msg = "盾を付与する味方の駒を選択してください";
+            if (card === CARD_IDATEN) msg = "韋駄天(飛+角移動)にする味方の駒を選択してください";
+            
+            this.updateMessage(msg);
+            this.render();
+        }
+    }
+
+    resolveCardTarget(x, y) {
+        const targetPiece = this.board[y][x];
+        const card = this.targetingCard.card;
+        const player = this.targetingCard.player;
+        let success = false;
+
+        if (card === CARD_WALL) {
+            if (!targetPiece) {
+                this.board[y][x] = { type: WALL, owner: -1, duration: 4 }; // 両者のターンで減少し、2往復で消滅
+                success = true;
+            }
+        } else if (card === CARD_FREEZE) {
+            if (targetPiece && targetPiece.owner !== player && targetPiece.type !== WALL) {
+                targetPiece.frozen = 2; // 相手のターンが終わるまで
+                success = true;
+            }
+        } else if (card === CARD_SHIELD) {
+            if (targetPiece && targetPiece.owner === player) {
+                targetPiece.shielded = 2; // 1往復分持続
+                success = true;
+            }
+        } else if (card === CARD_IDATEN) {
+            if (targetPiece && targetPiece.owner === player) {
+                targetPiece.idaten = 2; // 1往復分持続
+                success = true;
+            }
+        }
+
+        if (success) {
+            this.cards[player].splice(this.targetingCard.index, 1);
+            this.targetingCard = null;
+            this.render();
+            showModal(`${card}を発動しました！`, [{text: "確認", onClick: () => { hideModal(); this.endTurn(); }}]);
+        } else {
+            this.updateMessage("対象が不正です。もう一度選ぶかカードを押してキャンセル");
+        }
+    }
+
+    calcLegalMovesForSelected() {
+        this.legalMoves = [];
+        if (!this.selected) return;
+
+        const allMoves = this.getAllLegalMoves(this.turn);
+        
+        if (this.selected.type === 'board') {
+            const sx = this.selected.x;
+            const sy = this.selected.y;
+            this.legalMoves = allMoves
+                .filter(m => m.from.x === sx && m.from.y === sy)
+                .map(m => ({toX: m.to.x, toY: m.to.y}));
+        } else if (this.selected.type === 'hand') {
+            const pt = this.selected.pieceType;
+            this.legalMoves = allMoves
+                .filter(m => m.from.type === pt)
+                .map(m => ({toX: m.to.x, toY: m.to.y}));
+        }
+        this.render();
+    }
+
+    // 陣地判定 (成り条件)
+    isEnemyTerritory(y, player) {
+        return player === PLAYER ? y <= 2 : y >= 6;
+    }
+
+    executeMove(from, to) {
+        let movedPiece;
+        let isPromoteAttempt = false;
+        let forcePromote = false;
+
+        if (from.type === 'board') {
+            movedPiece = this.board[from.y][from.x];
+            const targetPiece = this.board[to.y][to.x];
+
+            // 駒を取る
+            if (targetPiece) {
+                let capturedType = targetPiece.type;
+                this.hands[this.turn].push(capturedType);
+            }
+
+            // 移動
+            this.board[from.y][from.x] = null;
+            this.board[to.y][to.x] = movedPiece;
+
+            // 成りの判定
+            if (!movedPiece.promoted && movedPiece.type !== KING && movedPiece.type !== GOLD) {
+                const enteredEnemy = this.isEnemyTerritory(to.y, this.turn) || this.isEnemyTerritory(from.y, this.turn);
+                if (enteredEnemy) {
+                    if (this.hasNoPlaceToGo(movedPiece.type, to.y, this.turn)) {
+                        forcePromote = true;
+                    } else {
+                        isPromoteAttempt = true;
+                    }
+                }
+            }
+
+        } else if (from.type === 'hand') {
+            // 持ち駒から消費
+            const index = this.hands[this.turn].indexOf(from.pieceType);
+            if (index > -1) {
+                this.hands[this.turn].splice(index, 1);
+            }
+            movedPiece = { type: from.pieceType, owner: this.turn, promoted: false };
+            this.board[to.y][to.x] = movedPiece;
+        }
+
+        this.lastMove = { from, to };
+        this.selected = null;
+        this.legalMoves = [];
+
+        if (forcePromote) {
+            movedPiece.promoted = true;
+            this.endTurn();
+        } else if (isPromoteAttempt) {
+            this.showPromoteModal(movedPiece, to);
+        } else {
+            this.endTurn();
+        }
+    }
+
+    showPromoteModal(piece, to) {
+        showModal("成りますか？", [
+            { text: "成る", onClick: () => { piece.promoted = true; hideModal(); this.endTurn(); } },
+            { text: "成らない", onClick: () => { hideModal(); this.endTurn(); } }
+        ]);
+    }
+
+    endTurn() {
+        // 効果のターン消費
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                let p = this.board[y][x];
+                if (p) {
+                    if (p.type === WALL) {
+                        p.duration--;
+                        if (p.duration <= 0) this.board[y][x] = null;
+                    }
+                    if (p.frozen && p.owner === this.turn) {
+                        p.frozen--;
+                        if (p.frozen <= 0) p.frozen = false;
+                    }
+                    if (p.idaten && p.owner === this.turn) {
+                        p.idaten--;
+                        if (p.idaten <= 0) p.idaten = false;
+                    }
+                    if (p.shielded && p.owner === this.turn) {
+                        p.shielded--;
+                        if (p.shielded <= 0) p.shielded = false;
+                    }
+                }
+            }
+        }
+
+        // 次のプレイヤーへ
+        const nextPlayer = this.turn === PLAYER ? OPPONENT : PLAYER;
+        
+        // 詰み判定
+        const nextMoves = this.getAllLegalMoves(nextPlayer);
+        if (nextMoves.length === 0) {
+            const winner = this.turn === PLAYER ? "先手" : "後手";
+            let msg = `${winner}の勝ちです！(詰み)`;
+            this.updateMessage(msg);
+            this.isGameOver = true;
+            this.render();
+            showModal(msg, [{text: "閉じる", onClick: hideModal}]);
+            return;
+        }
+
+        // カード支給 (先手後手合わせて10手ごと)
+        this.moveCount++;
+        let modalTriggered = false;
+        if (this.moveCount % 10 === 0) {
+            this.cards[PLAYER].push(CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)]);
+            this.cards[OPPONENT].push(CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)]);
+            modalTriggered = true;
+        }
+
+        // 王手メッセージ
+        if (this.isInCheck(nextPlayer)) {
+            this.updateMessage("王手！");
+        } else if (!this.targetingCard) {
+            this.updateMessage(nextPlayer === PLAYER ? "先手の番です" : "後手の番です");
+        }
+
+        this.turn = nextPlayer;
+        this.render();
+
+        if (modalTriggered) {
+            showModal("📜 計10手経過！両者に特殊カード支給！", [{text: "確認", onClick: hideModal}]);
+        }
+    }
+
+    updateMessage(text) {
+        document.getElementById('message').innerText = text;
+    }
+
+    render() {
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = '';
+
+        // 盤面描画
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => this.handleClick('board', x, y);
+
+                // 背景色（ハイライト・選択など）
+                if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) {
+                    cell.classList.add('selected');
+                }
+                if (this.lastMove && ((this.lastMove.from.type === 'board' && this.lastMove.from.x === x && this.lastMove.from.y === y) || (this.lastMove.to.x === x && this.lastMove.to.y === y))) {
+                    cell.classList.add('last-move');
+                }
+                if (this.legalMoves.some(m => m.toX === x && m.toY === y)) {
+                    cell.classList.add('highlight');
+                }
+
+                // 状態異常などのクラス追加
+                const piece = this.board[y][x];
+                if (piece) {
+                    if (piece.shielded) cell.classList.add('shielded-cell');
+                    if (piece.frozen) cell.classList.add('frozen-cell');
+                    if (piece.idaten) cell.classList.add('idaten-cell');
+
+                    const pieceEl = document.createElement('div');
+                    pieceEl.className = 'piece';
+                    if (piece.owner === OPPONENT) pieceEl.classList.add('opponent-piece');
+                    if (piece.promoted) pieceEl.classList.add('promoted');
+                    
+                    if (piece.type === WALL) {
+                        pieceEl.innerText = '壁';
+                        pieceEl.classList.add('wall');
+                    } else {
+                        let pStr = pieceStrs[piece.type][piece.promoted ? 1 : 0];
+                        if(piece.type === KING && piece.owner === OPPONENT) pStr = '王'; // 後手は王将
+                        pieceEl.innerText = pStr;
+                    }
+                    cell.appendChild(pieceEl);
+                }
+
+                boardEl.appendChild(cell);
+            }
+        }
+
+        // 持ち駒描画
+        this.renderHand(PLAYER, 'player-hand');
+        this.renderHand(OPPONENT, 'opponent-hand');
+        
+        // カード描画
+        this.renderCards(PLAYER, 'player-cards');
+        this.renderCards(OPPONENT, 'opponent-cards');
+    }
+
+    renderCards(player, containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        this.cards[player].forEach((card, idx) => {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'card';
+            cardEl.innerText = card;
+            
+            // 選択中のカードはハイライト
+            if (this.targetingCard && this.targetingCard.player === player && this.targetingCard.index === idx) {
+                cardEl.classList.add('selected-card');
+            }
+            
+            cardEl.onclick = () => {
+                if (this.turn === player) {
+                    this.handleClick('card', -1, -1, player, idx);
+                }
+            };
+            
+            container.appendChild(cardEl);
+        });
+    }
+
+    renderHand(player, containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        // 種類ごとにカウント
+        const counts = {};
+        const displayOrder = [ROOK, BISHOP, GOLD, SILVER, KNIGHT, LANCE, PAWN];
+        
+        this.hands[player].forEach(p => {
+            counts[p] = (counts[p] || 0) + 1;
+        });
+
+        displayOrder.forEach(type => {
+            if (counts[type]) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'hand-piece';
+                
+                if (this.selected && this.selected.type === 'hand' && this.selected.pieceType === type && this.turn === player) {
+                    wrapper.classList.add('selected');
+                }
+
+                if (player === OPPONENT) wrapper.classList.add('opponent-piece');
+                
+                let text = pieceStrs[type][0];
+                wrapper.innerText = text;
+                
+                if (counts[type] > 1) {
+                    const cnt = document.createElement('span');
+                    cnt.className = 'hand-count';
+                    cnt.innerText = counts[type];
+                    wrapper.appendChild(cnt);
+                }
+
+                wrapper.onclick = () => {
+                    if (this.turn === player) {
+                        this.handleClick('hand', -1, -1, type);
+                    }
+                };
+
+                container.appendChild(wrapper);
+            }
+        });
+    }
+}
+
+// モーダル管理
+const modalOverlay = document.getElementById('modal-overlay');
+const modalMessage = document.getElementById('modal-message');
+const modalButtons = document.getElementById('modal-buttons');
+
+function showModal(message, buttons) {
+    modalMessage.innerText = message;
+    modalButtons.innerHTML = '';
+    buttons.forEach(b => {
+        const btn = document.createElement('button');
+        btn.innerText = b.text;
+        btn.className = "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition";
+        btn.onclick = b.onClick;
+        modalButtons.appendChild(btn);
+    });
+    modalOverlay.style.display = 'flex';
+}
+
+function hideModal() {
+    modalOverlay.style.display = 'none';
+}
+
+// 初期化
+let game;
+window.onload = () => {
+    game = new Game();
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        showModal("最初からやり直しますか？", [
+            { text: "はい", onClick: () => { game.initBoard(); game.render(); hideModal(); } },
+            { text: "いいえ", onClick: hideModal }
+        ]);
+    });
+};
+
+</script>
+</body>
+</html>
