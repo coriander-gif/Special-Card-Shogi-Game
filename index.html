@@ -607,7 +607,27 @@ class Game {
         this.unsubscribe = null;
         this.bc = null; // BroadcastChannel用
         
+        // 描画最適化（DOMリユース）のための初期化
+        this.initBoardDOM();
+        
         this.initBoard();
+    }
+
+    // 初回のみ実行される、将棋盤の枠組みとなるDOMを生成する処理
+    initBoardDOM() {
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = '';
+        this.cells = [];
+        for (let y = 0; y < 9; y++) {
+            this.cells[y] = [];
+            for (let x = 0; x < 9; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => this.handleClick('board', x, y);
+                this.cells[y][x] = cell;
+                boardEl.appendChild(cell);
+            }
+        }
     }
 
     handleTimeUp(player) {
@@ -1396,16 +1416,16 @@ class Game {
         document.getElementById('message').innerText = text;
     }
 
+    // --- 【修正点】 DOM全削除(innerHTML='')を廃止し、差分更新に変更して軽量化 ---
     render() {
-        const boardEl = document.getElementById('board');
-        boardEl.innerHTML = '';
-
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
-                const cell = document.createElement('div');
+                const cell = this.cells[y][x];
+                
+                // 一旦基本クラスにリセット
                 cell.className = 'cell';
-                cell.onclick = () => this.handleClick('board', x, y);
 
+                // 背景ハイライトなどの追加
                 if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) {
                     cell.classList.add('selected');
                 }
@@ -1417,12 +1437,20 @@ class Game {
                 }
 
                 const piece = this.board[y][x];
+                let pieceEl = cell.querySelector('.piece');
+
                 if (piece) {
                     if (piece.shielded) cell.classList.add('shielded-cell');
                     if (piece.frozen) cell.classList.add('frozen-cell');
                     if (piece.idaten) cell.classList.add('idaten-cell');
 
-                    const pieceEl = document.createElement('div');
+                    // 駒のDOM要素がなければ作成
+                    if (!pieceEl) {
+                        pieceEl = document.createElement('div');
+                        cell.appendChild(pieceEl);
+                    }
+                    
+                    // 駒の状態更新
                     pieceEl.className = 'piece';
                     if (piece.owner === OPPONENT) pieceEl.classList.add('opponent-piece');
                     if (piece.promoted) pieceEl.classList.add('promoted');
@@ -1435,10 +1463,12 @@ class Game {
                         if(piece.type === KING && piece.owner === OPPONENT) pStr = '王';
                         pieceEl.innerText = pStr;
                     }
-                    cell.appendChild(pieceEl);
+                } else {
+                    // 駒がいないのにDOM要素が残っていれば削除
+                    if (pieceEl) {
+                        cell.removeChild(pieceEl);
+                    }
                 }
-
-                boardEl.appendChild(cell);
             }
         }
 
