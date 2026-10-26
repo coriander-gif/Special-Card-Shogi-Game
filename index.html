@@ -6,10 +6,10 @@
     <title>将棋</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap');
         
         body {
-            font-family: 'Shippori Mincho', serif;
+            font-family: 'Yuji Syuku', serif;
             /* 和紙のようなテクスチャとヴィネット（四隅が暗くなる）効果を追加 */
             background-color: #8c6a4f;
             background-image: 
@@ -346,9 +346,12 @@
     <!-- 後手エリア -->
     <div class="w-full flex justify-between items-start mb-2">
         <!-- 左上：後手の駒台 -->
-        <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
-            <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">後手の駒台</div>
-            <div id="opponent-hand" class="hand-area flex flex-wrap gap-1"></div>
+        <div class="flex items-start gap-1">
+            <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
+                <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">後手の駒台</div>
+                <div id="opponent-hand" class="hand-area flex flex-wrap gap-1"></div>
+            </div>
+            <button onclick="showCardHelp()" class="mt-1 w-6 h-6 bg-[#6e462e] text-[#ebd1ba] rounded-full font-bold shadow-[1px_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#5d4037] hover:scale-110 transition flex-shrink-0 flex items-center justify-center text-sm" title="カードの効果を見る">?</button>
         </div>
         <!-- 右上：ラベルとカード -->
         <div class="flex flex-col items-end flex-1 pl-2">
@@ -369,9 +372,12 @@
         <!-- 右下：ラベルと駒台 -->
         <div class="flex flex-col items-end">
             <div class="player-label mb-2">先手</div>
-            <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
-                <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">先手の駒台</div>
-                <div id="player-hand" class="hand-area flex flex-wrap gap-1"></div>
+            <div class="flex items-end gap-1">
+                <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
+                    <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">先手の駒台</div>
+                    <div id="player-hand" class="hand-area flex flex-wrap gap-1"></div>
+                </div>
+                <button onclick="showCardHelp()" class="mb-1 w-6 h-6 bg-[#6e462e] text-[#ebd1ba] rounded-full font-bold shadow-[1px_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#5d4037] hover:scale-110 transition flex-shrink-0 flex items-center justify-center text-sm" title="カードの効果を見る">?</button>
             </div>
         </div>
     </div>
@@ -1269,7 +1275,7 @@ const modalMessage = document.getElementById('modal-message');
 const modalButtons = document.getElementById('modal-buttons');
 
 function showModal(message, buttons) {
-    modalMessage.innerText = message;
+    modalMessage.innerHTML = message;
     modalButtons.innerHTML = '';
     buttons.forEach(b => {
         const btn = document.createElement('button');
@@ -1283,6 +1289,20 @@ function showModal(message, buttons) {
 
 function hideModal() {
     modalOverlay.style.display = 'none';
+}
+
+function showCardHelp() {
+    const helpHTML = `
+        <div class="text-left text-sm space-y-3 text-[#4a3623] max-w-sm">
+            <h3 class="font-bold text-lg text-center mb-2 border-b border-[#5d4037] pb-1">特殊カードの効果</h3>
+            <p><strong>【強奪】</strong><br>相手の持ち駒からランダムに1つ奪います。</p>
+            <p><strong>【氷結】</strong><br>指定した敵の駒1つを、次の相手ターン終了時まで移動不可にします。</p>
+            <p><strong>【盾】</strong><br>指定した味方の駒1つを、1ターンの間相手の攻撃対象から外します。</p>
+            <p><strong>【韋駄天】</strong><br>指定した味方の駒1つが、1ターンの間「飛車＋角行」の動きになります。</p>
+            <p><strong>【壁設置】</strong><br>空きマスに移動・通過不可の「壁」を設置します（2巡で消滅）。</p>
+        </div>
+    `;
+    showModal(helpHTML, [{text: "閉じる", onClick: hideModal}]);
 }
 
 // 初期化
