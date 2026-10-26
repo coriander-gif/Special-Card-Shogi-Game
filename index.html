@@ -455,38 +455,30 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'shogi-game-app';
 
 async function initFirebase() {
     try {
-        let config;
-        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            config = JSON.parse(__firebase_config);
-        } else {
-            // パラメータが渡されない場合のデフォルト設定（動作不具合を防ぐため）
-            config = {
-                apiKey: "AIzaSyDemoKeyForShogiGameApp12345",
-                authDomain: "shogi-app-demo.firebaseapp.com",
-                projectId: "shogi-app-demo",
-                storageBucket: "shogi-app-demo.appspot.com",
-                messagingSenderId: "123456789012",
-                appId: "1:123456789012:web:abcdef123456"
-            };
+        if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+            console.warn("Firebase設定がありません。オンライン機能は無効になります。");
+            isFirebaseReady = false;
+            return false;
         }
-
+        
+        const config = JSON.parse(__firebase_config);
         const app = initializeApp(config);
         db = getFirestore(app);
         auth = getAuth(app);
         
+        let cred;
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
+            cred = await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-            await signInAnonymously(auth);
+            cred = await signInAnonymously(auth);
         }
-        currentUser = auth.currentUser;
-        isFirebaseReady = true;
+        currentUser = cred.user;
+        isFirebaseReady = !!currentUser;
         return true;
     } catch (e) {
-        console.warn("Firebase 初期化警告（オフラインモード機能有効）:", e);
-        // エラー時も最小限の動作を保証
-        isFirebaseReady = true;
-        return true;
+        console.warn("Firebase初期化に失敗しました。オンライン機能は無効になります:", e);
+        isFirebaseReady = false;
+        return false;
     }
 }
 
@@ -663,11 +655,14 @@ class Game {
 
     // -- オンライン関連 --
     async createRoom() {
-        if (!isFirebaseReady) return;
+        if (!isFirebaseReady || !currentUser) {
+            window.showModal("エラー", "通信環境が準備されていません。<br>オフラインモードをご利用ください。", [{text: "OK", onClick: window.hideModal}]);
+            return;
+        }
         this.roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
         this.isOnline = true;
         
-        const uid = currentUser ? currentUser.uid : 'anon-' + Math.random().toString(36).substring(2, 7);
+        const uid = currentUser.uid;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
         try {
             await setDoc(roomRef, {
@@ -696,7 +691,10 @@ class Game {
     }
 
     async joinRoom(code) {
-        if (!isFirebaseReady) return;
+        if (!isFirebaseReady || !currentUser) {
+            window.showModal("エラー", "通信環境が準備されていません。", [{text: "OK", onClick: window.hideModal}]);
+            return;
+        }
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
         try {
             const docSnap = await getDoc(roomRef);
@@ -707,7 +705,7 @@ class Game {
                 
                 const hostRole = Math.random() < 0.5 ? PLAYER : OPPONENT;
                 const guestRole = hostRole === PLAYER ? OPPONENT : PLAYER;
-                const uid = currentUser ? currentUser.uid : 'anon-' + Math.random().toString(36).substring(2, 7);
+                const uid = currentUser.uid;
                 
                 await updateDoc(roomRef, {
                     status: 'playing',
@@ -732,8 +730,9 @@ class Game {
 
     listenToRoom() {
         if (this.unsubscribe) this.unsubscribe();
+        if (!isFirebaseReady || !currentUser) return;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
-        const uid = currentUser ? currentUser.uid : '';
+        const uid = currentUser.uid;
         
         this.unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists()) {
@@ -757,7 +756,12 @@ class Game {
             }
             
             if (data.gameState && data.lastUpdateUserId !== uid) {
-                this.loadState(data.gameState);
+                try {
+                    const stateObj = typeof data.gameState === 'string' ? JSON.parse(data.gameState) : data.gameState;
+                    this.loadState(stateObj);
+                } catch(e) {
+                    console.error("State parse error:", e);
+                }
             }
         }, (error) => {
             console.error("Firestore Listen Error:", error);
@@ -765,9 +769,11 @@ class Game {
     }
 
     async syncState() {
-        if (!this.isOnline || !this.roomId) return;
-        const uid = currentUser ? currentUser.uid : '';
-        const state = {
+        if (!this.isOnline || !this.roomId || !currentUser) return;
+        const uid = currentUser.uid;
+        
+        // Firestoreでの二次元配列(nested arrays)保存エラーを回避するため文字列化する
+        const stateStr = JSON.stringify({
             board: this.board,
             hands: this.hands,
             turn: this.turn,
@@ -779,12 +785,12 @@ class Game {
             moveCount: this.moveCount,
             isGameOver: this.isGameOver,
             hasStarted: this.hasStarted
-        };
+        });
         
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
         try {
             await updateDoc(roomRef, {
-                gameState: state,
+                gameState: stateStr,
                 lastUpdateUserId: uid
             });
         } catch(e) {
@@ -1530,8 +1536,8 @@ window.onload = async () => {
     });
 
     document.getElementById('menu-online').addEventListener('click', () => {
-        if (!isFirebaseReady) {
-            window.showModal("エラー", "通信環境が準備されていません。", [{text: "OK", onClick: window.hideModal}]);
+        if (!isFirebaseReady || !currentUser) {
+            window.showModal("エラー", "通信環境が準備されていません。<br>プレビュー環境で実行してください。", [{text: "OK", onClick: window.hideModal}]);
             return;
         }
         window.showModal("オンライン対戦", "どのように始めますか？", [
