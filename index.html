@@ -413,6 +413,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -469,6 +470,11 @@ const appId = firebaseConfig.projectId;
 async function initFirebase() {
     try {
         const app = initializeApp(firebaseConfig);
+        try {
+            analytics = getAnalytics(app);
+        } catch(e) {
+            console.warn("Analytics non-critical error:", e);
+        }
         db = getFirestore(app);
         auth = getAuth(app);
         
