@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>将棋</title>
+    <title>特殊カード将棋 - CPU対戦機能付き</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap');
@@ -271,8 +271,10 @@
             top: 10px;
             right: 10px;
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             z-index: 40;
+            justify-content: flex-end;
         }
         .menu-btn {
             padding: 6px 12px;
@@ -289,6 +291,14 @@
             border: 1px solid #5d4037;
         }
         #menu-local:hover { background-color: #5d4037; }
+        
+        #menu-cpu {
+            background-color: #065f46;
+            color: white;
+            border: 1px solid #064e3b;
+        }
+        #menu-cpu:hover { background-color: #064e3b; }
+
         #menu-online {
             background-color: #1e3a8a;
             color: white;
@@ -314,7 +324,8 @@
 
     <!-- トップメニュー -->
     <div id="top-menu">
-        <button id="menu-local" class="menu-btn">2人対戦(オフライン)</button>
+        <button id="menu-local" class="menu-btn">2人対戦</button>
+        <button id="menu-cpu" class="menu-btn">CPU対戦</button>
         <button id="menu-online" class="menu-btn">オンライン対戦</button>
     </div>
 
@@ -326,7 +337,7 @@
     <!-- 時計・設定パネル -->
     <div class="flex flex-col gap-4 w-full max-w-xs bg-[#e3ded6] p-4 rounded-lg shadow-lg border-2 border-[#5d4037] shrink-0 mt-8 lg:mt-0">
         <div id="opponent-clock-box" class="flex flex-col items-center p-3 border-4 border-transparent bg-white rounded shadow transition-colors rotate-180">
-            <div class="text-sm font-bold text-gray-600 mb-1">後手</div>
+            <div class="text-sm font-bold text-gray-600 mb-1" id="opponent-name">後手</div>
             <div id="opponent-time" class="text-3xl font-mono tracking-wider font-bold text-gray-800">10:00</div>
             <div id="opponent-byoyomi" class="text-sm h-5 font-bold mt-1 text-[#4a3623]"></div>
         </div>
@@ -365,7 +376,7 @@
         </div>
         <!-- 右上：ラベルとカード -->
         <div class="flex flex-col items-end flex-1 pl-2">
-            <div class="player-label mb-2 rotate-180">後手</div>
+            <div id="opponent-label" class="player-label mb-2 rotate-180">後手</div>
             <div id="opponent-cards" class="card-area justify-end"></div>
         </div>
     </div>
@@ -405,7 +416,7 @@
             <div id="modal-input-container" class="w-full hidden">
                 <input type="text" id="modal-input" class="modal-input" maxlength="5" placeholder="5文字のコード">
             </div>
-            <div id="modal-buttons" class="flex gap-4 mt-2">
+            <div id="modal-buttons" class="flex gap-4 mt-2 w-full justify-center flex-wrap">
                 <!-- ボタンが動的に追加されます -->
             </div>
         </div>
@@ -454,7 +465,6 @@ let currentUser = null;
 let isFirebaseReady = false;
 let analytics = null;
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBcvkE1KUfkKiPYf3DdiyQh1D556068Nss",
   authDomain: "special-card-shogi-game.firebaseapp.com",
@@ -472,9 +482,7 @@ async function initFirebase() {
         const app = initializeApp(firebaseConfig);
         try {
             analytics = getAnalytics(app);
-        } catch(e) {
-            console.warn("Analytics non-critical error:", e);
-        }
+        } catch(e) { }
         db = getFirestore(app);
         auth = getAuth(app);
         
@@ -488,7 +496,7 @@ async function initFirebase() {
         isFirebaseReady = !!currentUser;
         return true;
     } catch (e) {
-        console.warn("Firebase初期化に失敗しました。ローカルタブ間通信モードになります:", e);
+        console.warn("Firebase offline mode fallback.");
         isFirebaseReady = false;
         return false;
     }
@@ -605,15 +613,15 @@ class Game {
         this.roomId = null;
         this.myRole = null;
         this.unsubscribe = null;
-        this.bc = null; // BroadcastChannel用
+        this.bc = null;
         
-        // 描画最適化（DOMリユース）のための初期化
+        // CPUモード関連
+        this.cpuLevel = null; // null(OFF), 1(初級), 2(中級), 3(上級)
+        
         this.initBoardDOM();
-        
         this.initBoard();
     }
 
-    // 初回のみ実行される、将棋盤の枠組みとなるDOMを生成する処理
     initBoardDOM() {
         const boardEl = document.getElementById('board');
         boardEl.innerHTML = '';
@@ -627,6 +635,13 @@ class Game {
                 this.cells[y][x] = cell;
                 boardEl.appendChild(cell);
             }
+        }
+    }
+
+    updateMessage(msg) {
+        const msgEl = document.getElementById('message');
+        if (msgEl) {
+            msgEl.innerText = msg;
         }
     }
 
@@ -678,6 +693,19 @@ class Game {
                 }
             }
         }
+        
+        // ラベル更新
+        const oppLabel = document.getElementById('opponent-label');
+        const oppName = document.getElementById('opponent-name');
+        if (this.cpuLevel) {
+            const levelNames = {1: "初級", 2: "中級", 3: "上級"};
+            oppLabel.innerText = `CPU (${levelNames[this.cpuLevel]})`;
+            oppName.innerText = `CPU (${levelNames[this.cpuLevel]})`;
+        } else {
+            oppLabel.innerText = "後手";
+            oppName.innerText = "後手";
+        }
+
         this.updateMessage("先手の番です");
         this.render();
         
@@ -686,20 +714,26 @@ class Game {
         }
     }
 
+    startCPUGame(level) {
+        this.exitOnline();
+        this.cpuLevel = level;
+        this.myRole = PLAYER;
+        this.initBoard(false);
+        window.showModal("対局開始", `CPU（${level === 1 ? '初級' : level === 2 ? '中級' : '上級'}）との対局を開始します。<br>あなたは先手です。`, [{text: "OK", onClick: window.hideModal}]);
+    }
+
     // -- オンライン関連 --
     async createRoom() {
         this.roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
         this.isOnline = true;
+        this.cpuLevel = null;
         
         if (!isFirebaseReady || !currentUser) {
-            // ローカルタブ間通信（BroadcastChannel）フォールバック
             this.bc = new BroadcastChannel('shogi_room_' + this.roomId);
             this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
-            
             document.getElementById('online-status').style.display = 'block';
             document.getElementById('room-code-display').innerText = this.roomId;
             document.getElementById('my-role-display').innerText = '待機中...';
-            
             window.showModal("部屋を作成しました", `他のプレイヤーにこのコードを教えてください: <br><strong class="text-2xl">${this.roomId}</strong><br>対戦相手を待っています...<br><span class="text-sm text-red-600">(※ローカルモード: 同じブラウザの別タブでのみ有効です)</span>`, [
                 {text: "キャンセル", onClick: () => { window.hideModal(); this.exitOnline(); }}
             ]);
@@ -709,26 +743,15 @@ class Game {
         const uid = currentUser.uid;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
         try {
-            await setDoc(roomRef, {
-                status: 'waiting',
-                host: uid,
-                guest: null,
-                roles: {},
-                gameState: null,
-                lastUpdateUserId: uid,
-                createdAt: new Date().getTime()
-            });
-            
+            await setDoc(roomRef, { status: 'waiting', host: uid, guest: null, roles: {}, gameState: null, lastUpdateUserId: uid, createdAt: new Date().getTime() });
             this.listenToRoom();
             document.getElementById('online-status').style.display = 'block';
             document.getElementById('room-code-display').innerText = this.roomId;
             document.getElementById('my-role-display').innerText = '待機中...';
-            
             window.showModal("部屋を作成しました", `他のプレイヤーにこのコードを教えてください: <br><strong class="text-2xl">${this.roomId}</strong><br>対戦相手を待っています...`, [
                 {text: "キャンセル", onClick: () => { window.hideModal(); this.exitOnline(); }}
             ]);
         } catch(e) {
-            console.error("Room creation error:", e);
             window.showModal("通信エラー", "部屋の作成に失敗しました。", [{text: "閉じる", onClick: window.hideModal}]);
             this.exitOnline();
         }
@@ -736,22 +759,17 @@ class Game {
 
     async joinRoom(code) {
         if (!isFirebaseReady || !currentUser) {
-            // ローカルタブ間通信（BroadcastChannel）フォールバック
             this.roomId = code;
             this.isOnline = true;
+            this.cpuLevel = null;
             this.myRole = OPPONENT;
-            
             this.bc = new BroadcastChannel('shogi_room_' + this.roomId);
             this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
-            
             document.getElementById('online-status').style.display = 'block';
             document.getElementById('room-code-display').innerText = this.roomId;
             document.getElementById('my-role-display').innerText = '後手';
             window.hideModal();
-            
             window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「後手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
-            
-            // ホストに自分が参加したことを知らせる
             this.bc.postMessage({ type: 'join' });
             return;
         }
@@ -759,23 +777,14 @@ class Game {
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
         try {
             const docSnap = await getDoc(roomRef);
-            
             if (docSnap.exists() && docSnap.data().status === 'waiting') {
                 this.roomId = code;
                 this.isOnline = true;
-                
+                this.cpuLevel = null;
                 const hostRole = Math.random() < 0.5 ? PLAYER : OPPONENT;
                 const guestRole = hostRole === PLAYER ? OPPONENT : PLAYER;
                 const uid = currentUser.uid;
-                
-                await updateDoc(roomRef, {
-                    status: 'playing',
-                    guest: uid,
-                    roles: {
-                        [docSnap.data().host]: hostRole,
-                        [uid]: guestRole
-                    }
-                });
+                await updateDoc(roomRef, { status: 'playing', guest: uid, roles: { [docSnap.data().host]: hostRole, [uid]: guestRole } });
                 this.listenToRoom();
                 document.getElementById('online-status').style.display = 'block';
                 document.getElementById('room-code-display').innerText = this.roomId;
@@ -784,7 +793,6 @@ class Game {
                 window.showModal("エラー", "部屋が見つからないか、既に対戦中です。", [{text: "閉じる", onClick: window.hideModal}]);
             }
         } catch(e) {
-            console.error("Join room error:", e);
             window.showModal("通信エラー", "部屋への参加に失敗しました。", [{text: "閉じる", onClick: window.hideModal}]);
         }
     }
@@ -801,44 +809,30 @@ class Game {
                 window.showModal("切断", "部屋が解散されました。", [{text: "OK", onClick: window.hideModal}]);
                 return;
             }
-            
             const data = docSnap.data();
             if (data.status === 'playing' && this.myRole === null) {
                 this.myRole = data.roles[uid] !== undefined ? data.roles[uid] : OPPONENT;
                 document.getElementById('my-role-display').innerText = (this.myRole === PLAYER ? '先手' : '後手');
                 window.hideModal();
-                
-                const roleStr = this.myRole === PLAYER ? '先手' : '後手';
-                window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「${roleStr}」です。`, [{text: "対局開始", onClick: window.hideModal}]);
-
-                if (data.host === uid) {
-                    this.initBoard(true);
-                }
+                window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「${this.myRole === PLAYER ? '先手' : '後手'}」です。`, [{text: "対局開始", onClick: window.hideModal}]);
+                if (data.host === uid) this.initBoard(true);
             }
-            
             if (data.gameState && data.lastUpdateUserId !== uid) {
                 try {
-                    const stateObj = typeof data.gameState === 'string' ? JSON.parse(data.gameState) : data.gameState;
-                    this.loadState(stateObj);
-                } catch(e) {
-                    console.error("State parse error:", e);
-                }
+                    this.loadState(typeof data.gameState === 'string' ? JSON.parse(data.gameState) : data.gameState);
+                } catch(e) { console.error(e); }
             }
-        }, (error) => {
-            console.error("Firestore Listen Error:", error);
         });
     }
 
     handleLocalMessage(data) {
         if (data.type === 'join' && this.myRole === null) {
-            // ホスト側がゲストの参加を受け取る
             this.myRole = PLAYER;
             document.getElementById('my-role-display').innerText = '先手';
             window.hideModal();
             window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「先手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
             this.initBoard(true);
         } else if (data.type === 'sync' && data.state) {
-            // 状態同期を受け取る
             this.loadState(data.state);
         }
     }
@@ -856,11 +850,8 @@ class Game {
         this.isGameOver = state.isGameOver;
         this.hasStarted = state.hasStarted;
         
-        if (this.hasStarted) {
-            this.clock.start();
-        } else if (this.isGameOver) {
-            this.clock.stop();
-        }
+        if (this.hasStarted) this.clock.start();
+        else if (this.isGameOver) this.clock.stop();
         this.clock.switchTurn(this.turn);
         
         this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
@@ -872,54 +863,23 @@ class Game {
 
     async syncState() {
         if (!this.isOnline || !this.roomId) return;
-        
-        const stateObj = {
-            board: this.board,
-            hands: this.hands,
-            turn: this.turn,
-            cards: this.cards,
-            clockTime: this.clock.time,
-            clockByoyomi: this.clock.inByoyomi,
-            clockCurrentByoyomi: this.clock.currentByoyomi,
-            lastMove: this.lastMove,
-            moveCount: this.moveCount,
-            isGameOver: this.isGameOver,
-            hasStarted: this.hasStarted
-        };
+        const stateObj = { board: this.board, hands: this.hands, turn: this.turn, cards: this.cards, clockTime: this.clock.time, clockByoyomi: this.clock.inByoyomi, clockCurrentByoyomi: this.clock.currentByoyomi, lastMove: this.lastMove, moveCount: this.moveCount, isGameOver: this.isGameOver, hasStarted: this.hasStarted };
 
         if (!isFirebaseReady || !currentUser) {
-            if (this.bc) {
-                this.bc.postMessage({ type: 'sync', state: stateObj });
-            }
+            if (this.bc) this.bc.postMessage({ type: 'sync', state: stateObj });
             return;
         }
 
-        const uid = currentUser.uid;
-        const stateStr = JSON.stringify(stateObj);
-        
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
-        try {
-            await updateDoc(roomRef, {
-                gameState: stateStr,
-                lastUpdateUserId: uid
-            });
-        } catch(e) {
-            console.error("Sync error:", e);
-        }
+        try { await updateDoc(roomRef, { gameState: JSON.stringify(stateObj), lastUpdateUserId: currentUser.uid }); } catch(e) {}
     }
 
     exitOnline() {
         this.isOnline = false;
         this.roomId = null;
         this.myRole = null;
-        if (this.unsubscribe) {
-            this.unsubscribe();
-            this.unsubscribe = null;
-        }
-        if (this.bc) {
-            this.bc.close();
-            this.bc = null;
-        }
+        if (this.unsubscribe) { this.unsubscribe(); this.unsubscribe = null; }
+        if (this.bc) { this.bc.close(); this.bc = null; }
         document.getElementById('online-status').style.display = 'none';
         this.initBoard(false);
     }
@@ -969,7 +929,6 @@ class Game {
         if (piece.frozen) return [];
 
         let movements = this.getPieceMovement(piece);
-        
         if (piece.idaten) {
             movements = [
                 {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
@@ -1004,10 +963,7 @@ class Game {
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const p = this.board[y][x];
-                if (p && p.type === KING && p.owner === player) {
-                    kingX = x; kingY = y;
-                    break;
-                }
+                if (p && p.type === KING && p.owner === player) { kingX = x; kingY = y; break; }
             }
             if(kingX !== -1) break;
         }
@@ -1019,9 +975,7 @@ class Game {
                 const p = this.board[y][x];
                 if (p && p.owner === opponent) {
                     const moves = this.getRawMoves(x, y);
-                    if (moves.some(m => m.toX === kingX && m.toY === kingY)) {
-                        return true;
-                    }
+                    if (moves.some(m => m.toX === kingX && m.toY === kingY)) return true;
                 }
             }
         }
@@ -1056,9 +1010,7 @@ class Game {
     isNifu(x, player) {
         for (let y = 0; y < 9; y++) {
             const p = this.board[y][x];
-            if (p && p.type === PAWN && p.owner === player && !p.promoted) {
-                return true;
-            }
+            if (p && p.type === PAWN && p.owner === player && !p.promoted) return true;
         }
         return false;
     }
@@ -1098,7 +1050,6 @@ class Game {
                     if (this.board[y][x] === null) {
                         if (type === PAWN && this.isNifu(x, player)) continue;
                         if (this.hasNoPlaceToGo(type, y, player)) continue;
-                        
                         if (this.testMoveUnchecks({type: type}, {x, y}, player)) {
                             if (type === PAWN && this.isUchifuZume(x, y, player)) continue;
                             allMoves.push({from: {type: type}, to: {x, y}});
@@ -1116,9 +1067,7 @@ class Game {
         let isMate = false;
         if (this.isInCheck(opponent)) {
             const opMoves = this.getAllLegalMoves(opponent);
-            if (opMoves.length === 0) {
-                isMate = true;
-            }
+            if (opMoves.length === 0) isMate = true;
         }
         this.board[y][x] = null;
         return isMate;
@@ -1126,10 +1075,8 @@ class Game {
 
     handleClick(type, x, y, pieceType = null, cardIndex = null) {
         if (this.isGameOver) return;
-        
-        if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) {
-            return;
-        }
+        if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) return;
+        if (this.cpuLevel && this.turn === OPPONENT) return; // CPU思考中はクリック無視
 
         if (!this.hasStarted) {
             this.hasStarted = true;
@@ -1184,6 +1131,8 @@ class Game {
     handleHandClick(player, type) {
         if (this.isGameOver) return;
         if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) return;
+        if (this.cpuLevel && this.turn === OPPONENT) return;
+
         if (this.turn === player) {
             this.selected = { type: 'hand', pieceType: type };
             this.calcLegalMovesForSelected();
@@ -1199,12 +1148,10 @@ class Game {
                 return;
             }
 
-            let msg = "";
             const rIdx = Math.floor(Math.random() * this.hands[opp].length);
             const stolen = this.hands[opp].splice(rIdx, 1)[0];
             this.hands[player].push(stolen);
-            msg = `${card}発動！相手の駒を奪いました`;
-            
+            let msg = `${card}発動！相手の駒を奪いました`;
             this.cards[player].splice(cardIndex, 1);
             this.render();
             window.showModal(msg, "", [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
@@ -1265,62 +1212,52 @@ class Game {
     calcLegalMovesForSelected() {
         this.legalMoves = [];
         if (!this.selected) return;
-
         const allMoves = this.getAllLegalMoves(this.turn);
-        
         if (this.selected.type === 'board') {
-            const sx = this.selected.x;
-            const sy = this.selected.y;
-            this.legalMoves = allMoves
-                .filter(m => m.from.x === sx && m.from.y === sy)
-                .map(m => ({toX: m.to.x, toY: m.to.y}));
+            const sx = this.selected.x, sy = this.selected.y;
+            this.legalMoves = allMoves.filter(m => m.from.x === sx && m.from.y === sy).map(m => ({toX: m.to.x, toY: m.to.y}));
         } else if (this.selected.type === 'hand') {
             const pt = this.selected.pieceType;
-            this.legalMoves = allMoves
-                .filter(m => m.from.type === pt)
-                .map(m => ({toX: m.to.x, toY: m.to.y}));
+            this.legalMoves = allMoves.filter(m => m.from.type === pt).map(m => ({toX: m.to.x, toY: m.to.y}));
         }
         this.render();
     }
 
-    isEnemyTerritory(y, player) {
-        return player === PLAYER ? y <= 2 : y >= 6;
+    isEnemyTerritory(y, player) { return player === PLAYER ? y <= 2 : y >= 6; }
+
+    canPromote(move, player) {
+        if (move.from.type) return false;
+        const piece = this.board[move.from.y][move.from.x];
+        if (!piece || piece.promoted || piece.type === KING || piece.type === GOLD || piece.type === WALL) return false;
+        return this.isEnemyTerritory(move.to.y, player) || this.isEnemyTerritory(move.from.y, player);
     }
 
-    executeMove(from, to) {
+    executeMove(from, to, autoPromote = null) {
         let movedPiece;
         let isPromoteAttempt = false;
         let forcePromote = false;
 
-        if (from.type === 'board') {
+        if (from.type === 'board' || from.x !== undefined) {
             movedPiece = this.board[from.y][from.x];
             const targetPiece = this.board[to.y][to.x];
 
             if (targetPiece) {
-                let capturedType = targetPiece.type;
-                this.hands[this.turn].push(capturedType);
+                this.hands[this.turn].push(targetPiece.type);
             }
-
             this.board[from.y][from.x] = null;
             this.board[to.y][to.x] = movedPiece;
 
             if (!movedPiece.promoted && movedPiece.type !== KING && movedPiece.type !== GOLD) {
-                const enteredEnemy = this.isEnemyTerritory(to.y, this.turn) || this.isEnemyTerritory(from.y, this.turn);
-                if (enteredEnemy) {
-                    if (this.hasNoPlaceToGo(movedPiece.type, to.y, this.turn)) {
-                        forcePromote = true;
-                    } else {
-                        isPromoteAttempt = true;
-                    }
+                if (this.isEnemyTerritory(to.y, this.turn) || this.isEnemyTerritory(from.y, this.turn)) {
+                    if (this.hasNoPlaceToGo(movedPiece.type, to.y, this.turn)) forcePromote = true;
+                    else isPromoteAttempt = true;
                 }
             }
-
-        } else if (from.type === 'hand') {
-            const index = this.hands[this.turn].indexOf(from.pieceType);
-            if (index > -1) {
-                this.hands[this.turn].splice(index, 1);
-            }
-            movedPiece = { type: from.pieceType, owner: this.turn, promoted: false };
+        } else if (from.type === 'hand' || from.type !== undefined) {
+            const type = from.pieceType || from.type;
+            const index = this.hands[this.turn].indexOf(type);
+            if (index > -1) this.hands[this.turn].splice(index, 1);
+            movedPiece = { type: type, owner: this.turn, promoted: false };
             this.board[to.y][to.x] = movedPiece;
         }
 
@@ -1328,8 +1265,10 @@ class Game {
         this.selected = null;
         this.legalMoves = [];
 
-        if (forcePromote) {
+        if (forcePromote || autoPromote === true) {
             movedPiece.promoted = true;
+            this.endTurn();
+        } else if (autoPromote === false) {
             this.endTurn();
         } else if (isPromoteAttempt) {
             this.showPromoteModal(movedPiece, to);
@@ -1350,29 +1289,17 @@ class Game {
             for (let x = 0; x < 9; x++) {
                 let p = this.board[y][x];
                 if (p) {
-                    if (p.type === WALL) {
-                        p.duration--;
-                        if (p.duration <= 0) this.board[y][x] = null;
-                    }
-                    if (p.frozen && p.owner === this.turn) {
-                        p.frozen--;
-                        if (p.frozen <= 0) p.frozen = false;
-                    }
-                    if (p.idaten && p.owner === this.turn) {
-                        p.idaten--;
-                        if (p.idaten <= 0) p.idaten = false;
-                    }
-                    if (p.shielded && p.owner === this.turn) {
-                        p.shielded--;
-                        if (p.shielded <= 0) p.shielded = false;
-                    }
+                    if (p.type === WALL) { p.duration--; if (p.duration <= 0) this.board[y][x] = null; }
+                    if (p.frozen && p.owner === this.turn) { p.frozen--; if (p.frozen <= 0) p.frozen = false; }
+                    if (p.idaten && p.owner === this.turn) { p.idaten--; if (p.idaten <= 0) p.idaten = false; }
+                    if (p.shielded && p.owner === this.turn) { p.shielded--; if (p.shielded <= 0) p.shielded = false; }
                 }
             }
         }
 
         const nextPlayer = this.turn === PLAYER ? OPPONENT : PLAYER;
-        
         const nextMoves = this.getAllLegalMoves(nextPlayer);
+        
         if (nextMoves.length === 0) {
             this.clock.stop();
             const winner = this.turn === PLAYER ? "先手" : "後手";
@@ -1403,29 +1330,262 @@ class Game {
         this.clock.switchTurn(this.turn);
         this.render();
 
-        if (modalTriggered) {
+        if (modalTriggered && !this.cpuLevel) {
             window.showModal("カード支給", "📜 計10手経過！両者に特殊カード支給！", [{text: "確認", onClick: window.hideModal}]);
         }
 
         if (this.isOnline) {
             this.syncState();
         }
+
+        // CPUのターン
+        if (this.cpuLevel && this.turn === OPPONENT && !this.isGameOver) {
+            setTimeout(() => this.cpuThink(), 500); // 演出のタメ
+        }
     }
 
-    updateMessage(text) {
-        document.getElementById('message').innerText = text;
+    // --- CPU思考ルーチン ---
+    async cpuThink() {
+        this.updateMessage("CPUが思考中...");
+        await new Promise(r => setTimeout(r, 50)); // UI更新待ち
+
+        // カードをランダムに使用する (約20%の確率)
+        if (this.cards[OPPONENT].length > 0 && Math.random() < 0.2) {
+            const cardIdx = Math.floor(Math.random() * this.cards[OPPONENT].length);
+            const card = this.cards[OPPONENT][cardIdx];
+            if (this.executeCPUCard(card, cardIdx)) {
+                await new Promise(r => setTimeout(r, 800)); // 発動演出
+            }
+        }
+
+        const moves = this.getAllLegalMoves(OPPONENT);
+        if (moves.length === 0) return;
+
+        let bestMove = null;
+        let promote = false;
+
+        if (this.cpuLevel === 1) { // 初級 (ランダム)
+            bestMove = moves[Math.floor(Math.random() * moves.length)];
+            if (this.canPromote(bestMove, OPPONENT)) promote = Math.random() > 0.5;
+        } else { // 中級(depth=2), 上級(depth=3)
+            const depth = this.cpuLevel === 2 ? 2 : 3;
+            const res = await this.getBestMoveAlphaBetaAsync(depth, OPPONENT, moves);
+            bestMove = res.move;
+            promote = res.promote;
+        }
+
+        if (bestMove) {
+            this.executeMove(bestMove.from, {x: bestMove.to.x, y: bestMove.to.y}, promote);
+        }
     }
 
-    // --- 【修正点】 DOM全削除(innerHTML='')を廃止し、差分更新に変更して軽量化 ---
+    executeCPUCard(card, cardIdx) {
+        let success = false;
+        if (card === CARD_STEAL) {
+            if (this.hands[PLAYER].length > 0) {
+                const rIdx = Math.floor(Math.random() * this.hands[PLAYER].length);
+                const stolen = this.hands[PLAYER].splice(rIdx, 1)[0];
+                this.hands[OPPONENT].push(stolen);
+                success = true;
+            }
+        } else if (card === CARD_WALL) {
+            let emptyCells = [];
+            for (let y = 3; y < 6; y++) {
+                for (let x = 0; x < 9; x++) if (!this.board[y][x]) emptyCells.push({x, y});
+            }
+            if (emptyCells.length > 0) {
+                let tgt = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                this.board[tgt.y][tgt.x] = { type: WALL, owner: -1, duration: 4 };
+                success = true;
+            }
+        } else if (card === CARD_FREEZE) {
+            let targets = [];
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    let p = this.board[y][x];
+                    if (p && p.owner === PLAYER && p.type !== WALL) targets.push(p);
+                }
+            }
+            if (targets.length > 0) {
+                let tgt = targets[Math.floor(Math.random() * targets.length)];
+                tgt.frozen = 2;
+                success = true;
+            }
+        } else if (card === CARD_SHIELD || card === CARD_IDATEN) {
+            let targets = [];
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    let p = this.board[y][x];
+                    if (p && p.owner === OPPONENT && p.type !== WALL) targets.push(p);
+                }
+            }
+            if (targets.length > 0) {
+                let tgt = targets[Math.floor(Math.random() * targets.length)];
+                if (card === CARD_SHIELD) tgt.shielded = 2;
+                if (card === CARD_IDATEN) tgt.idaten = 2;
+                success = true;
+            }
+        }
+
+        if (success) {
+            this.cards[OPPONENT].splice(cardIdx, 1);
+            this.render();
+            return true;
+        }
+        return false;
+    }
+
+    // 評価関数
+    evaluateBoard() {
+        let score = 0;
+        const pVals = { [PAWN]: 100, [LANCE]: 300, [KNIGHT]: 400, [SILVER]: 500, [GOLD]: 600, [BISHOP]: 800, [ROOK]: 1000, [KING]: 10000, [WALL]: 0 };
+        const pPromVals = { [PAWN]: 600, [LANCE]: 600, [KNIGHT]: 600, [SILVER]: 600, [BISHOP]: 1200, [ROOK]: 1500 };
+
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.type !== WALL) {
+                    let val = p.promoted ? pPromVals[p.type] : pVals[p.type];
+                    // 陣地前進ボーナス（攻めの姿勢）
+                    if (p.type !== KING) {
+                        if (p.owner === OPPONENT) val += y * 2;
+                        else val += (8 - y) * 2;
+                    }
+                    if (p.owner === OPPONENT) score += val;
+                    else score -= val;
+                }
+            }
+        }
+
+        for (let type of this.hands[OPPONENT]) score += pVals[type] * 1.1;
+        for (let type of this.hands[PLAYER]) score -= pVals[type] * 1.1;
+
+        return score; // CPU（OPPONENT）から見たスコア
+    }
+
+    // AI用状態の操作（Do / Undo）
+    doMoveTemp(move, player, promote) {
+        const history = {
+            hands: { [PLAYER]: [...this.hands[PLAYER]], [OPPONENT]: [...this.hands[OPPONENT]] }
+        };
+        
+        if (move.from.type) { // 持ち駒
+            history.fromType = move.from.type;
+            history.toPiece = this.board[move.to.y][move.to.x];
+            
+            const idx = this.hands[player].indexOf(move.from.type);
+            if(idx > -1) this.hands[player].splice(idx, 1);
+            this.board[move.to.y][move.to.x] = { type: move.from.type, owner: player, promoted: false };
+        } else { // 盤上の駒
+            history.fromPiece = this.board[move.from.y][move.from.x];
+            history.toPiece = this.board[move.to.y][move.to.x];
+            
+            let p = { ...history.fromPiece };
+            if (promote) p.promoted = true;
+            
+            if (history.toPiece) {
+                this.hands[player].push(history.toPiece.type);
+            }
+            this.board[move.from.y][move.from.x] = null;
+            this.board[move.to.y][move.to.x] = p;
+        }
+        return history;
+    }
+
+    undoMoveTemp(move, player, history) {
+        this.hands[PLAYER] = history.hands[PLAYER];
+        this.hands[OPPONENT] = history.hands[OPPONENT];
+        
+        if (move.from.type) {
+            this.board[move.to.y][move.to.x] = history.toPiece;
+        } else {
+            this.board[move.from.y][move.from.x] = history.fromPiece;
+            this.board[move.to.y][move.to.x] = history.toPiece;
+        }
+    }
+
+    async getBestMoveAlphaBetaAsync(depth, player, initialMoves) {
+        let bestScore = -Infinity;
+        let bestMove = null;
+        let bestPromote = false;
+        let alpha = -Infinity;
+        let beta = Infinity;
+
+        // 手順のランダム性を少し入れる
+        const moves = [...initialMoves].sort(() => Math.random() - 0.5);
+
+        for (let m of moves) {
+            const canPro = this.canPromote(m, player);
+            const promotes = canPro ? [true, false] : [false];
+            
+            for (let pro of promotes) {
+                const history = this.doMoveTemp(m, player, pro);
+                const score = this.alphaBetaSearch(depth - 1, alpha, beta, PLAYER);
+                this.undoMoveTemp(m, player, history);
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = m;
+                    bestPromote = pro;
+                }
+                alpha = Math.max(alpha, bestScore);
+            }
+            // 処理をメインスレッドに譲りUIフリーズを回避
+            await new Promise(r => setTimeout(r, 0));
+        }
+
+        return { move: bestMove || moves[0], promote: bestPromote };
+    }
+
+    alphaBetaSearch(depth, alpha, beta, player) {
+        if (depth === 0) return this.evaluateBoard();
+
+        const moves = this.getAllLegalMoves(player);
+        if (moves.length === 0) {
+            return player === OPPONENT ? -99999 - depth : 99999 + depth;
+        }
+
+        if (player === OPPONENT) {
+            let maxScore = -Infinity;
+            for (let m of moves) {
+                const canPro = this.canPromote(m, player);
+                const promotes = canPro ? [true] : [false]; // AIの探索空間削減のため必ず成るを優先
+                for (let pro of promotes) {
+                    const history = this.doMoveTemp(m, player, pro);
+                    const score = this.alphaBetaSearch(depth - 1, alpha, beta, PLAYER);
+                    this.undoMoveTemp(m, player, history);
+                    maxScore = Math.max(maxScore, score);
+                    alpha = Math.max(alpha, score);
+                    if (beta <= alpha) break;
+                }
+                if (beta <= alpha) break;
+            }
+            return maxScore;
+        } else {
+            let minScore = Infinity;
+            for (let m of moves) {
+                const canPro = this.canPromote(m, player);
+                const promotes = canPro ? [true] : [false];
+                for (let pro of promotes) {
+                    const history = this.doMoveTemp(m, player, pro);
+                    const score = this.alphaBetaSearch(depth - 1, alpha, beta, OPPONENT);
+                    this.undoMoveTemp(m, player, history);
+                    minScore = Math.min(minScore, score);
+                    beta = Math.min(beta, score);
+                    if (beta <= alpha) break;
+                }
+                if (beta <= alpha) break;
+            }
+            return minScore;
+        }
+    }
+    // --- 描画 ---
     render() {
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const cell = this.cells[y][x];
-                
-                // 一旦基本クラスにリセット
                 cell.className = 'cell';
 
-                // 背景ハイライトなどの追加
                 if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) {
                     cell.classList.add('selected');
                 }
@@ -1444,13 +1604,11 @@ class Game {
                     if (piece.frozen) cell.classList.add('frozen-cell');
                     if (piece.idaten) cell.classList.add('idaten-cell');
 
-                    // 駒のDOM要素がなければ作成
                     if (!pieceEl) {
                         pieceEl = document.createElement('div');
                         cell.appendChild(pieceEl);
                     }
                     
-                    // 駒の状態更新
                     pieceEl.className = 'piece';
                     if (piece.owner === OPPONENT) pieceEl.classList.add('opponent-piece');
                     if (piece.promoted) pieceEl.classList.add('promoted');
@@ -1464,10 +1622,7 @@ class Game {
                         pieceEl.innerText = pStr;
                     }
                 } else {
-                    // 駒がいないのにDOM要素が残っていれば削除
-                    if (pieceEl) {
-                        cell.removeChild(pieceEl);
-                    }
+                    if (pieceEl) cell.removeChild(pieceEl);
                 }
             }
         }
@@ -1491,10 +1646,7 @@ class Game {
                 cardEl.classList.add('selected-card');
             }
             
-            cardEl.onclick = () => {
-                this.handleClick('card', -1, -1, player, idx);
-            };
-            
+            cardEl.onclick = () => { this.handleClick('card', -1, -1, player, idx); };
             container.appendChild(cardEl);
         });
     }
@@ -1505,34 +1657,25 @@ class Game {
         
         const counts = {};
         const displayOrder = [ROOK, BISHOP, GOLD, SILVER, KNIGHT, LANCE, PAWN];
-        
         this.hands[player].forEach(p => { counts[p] = (counts[p] || 0) + 1; });
 
         displayOrder.forEach(type => {
             if (counts[type]) {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'hand-piece';
-                
                 if (this.selected && this.selected.type === 'hand' && this.selected.pieceType === type && this.turn === player) {
                     wrapper.classList.add('selected');
                 }
-
                 if (player === OPPONENT) wrapper.classList.add('opponent-piece');
                 
-                let text = pieceStrs[type][0];
-                wrapper.innerText = text;
-                
+                wrapper.innerText = pieceStrs[type][0];
                 if (counts[type] > 1) {
                     const cnt = document.createElement('span');
                     cnt.className = 'hand-count';
                     cnt.innerText = counts[type];
                     wrapper.appendChild(cnt);
                 }
-
-                wrapper.onclick = () => {
-                    this.handleHandClick(player, type);
-                };
-
+                wrapper.onclick = () => { this.handleHandClick(player, type); };
                 container.appendChild(wrapper);
             }
         });
@@ -1553,32 +1696,23 @@ window.showModal = function(title, message, buttons, isOpponent = false, showInp
     modalMessage.innerHTML = message;
     modalButtons.innerHTML = '';
     
-    if (showInput) {
-        modalInputContainer.classList.remove('hidden');
-        modalInput.value = "";
-    } else {
-        modalInputContainer.classList.add('hidden');
-    }
+    if (showInput) { modalInputContainer.classList.remove('hidden'); modalInput.value = ""; } 
+    else { modalInputContainer.classList.add('hidden'); }
 
-    if (isOpponent) {
-        modalContent.classList.add('rotate-180');
-    } else {
-        modalContent.classList.remove('rotate-180');
-    }
+    if (isOpponent) modalContent.classList.add('rotate-180');
+    else modalContent.classList.remove('rotate-180');
 
     buttons.forEach(b => {
         const btn = document.createElement('button');
         btn.innerText = b.text;
-        btn.className = "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex-1 font-bold";
+        btn.className = "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex-1 font-bold whitespace-nowrap";
         btn.onclick = b.onClick;
         modalButtons.appendChild(btn);
     });
     modalOverlay.style.display = 'flex';
 }
 
-window.hideModal = function() {
-    modalOverlay.style.display = 'none';
-}
+window.hideModal = function() { modalOverlay.style.display = 'none'; }
 
 window.showCardHelp = function(player = PLAYER) {
     const helpHTML = `
@@ -1620,14 +1754,20 @@ window.onload = async () => {
         ]);
     });
 
-    // メニューのイベント
     document.getElementById('menu-local').addEventListener('click', () => {
-        if (game.isOnline) {
-            window.showModal("オフラインに切替", "オンライン対戦を終了してオフラインモードに戻りますか？", [
-                { text: "はい", onClick: () => { game.exitOnline(); window.hideModal(); } },
-                { text: "いいえ", onClick: window.hideModal }
-            ]);
-        }
+        window.showModal("2人対戦", "オフラインで2人対戦を開始しますか？", [
+            { text: "はい", onClick: () => { game.exitOnline(); game.cpuLevel = null; game.initBoard(false); window.hideModal(); } },
+            { text: "いいえ", onClick: window.hideModal }
+        ]);
+    });
+
+    document.getElementById('menu-cpu').addEventListener('click', () => {
+        window.showModal("CPU対戦", "CPUの強さを選んでください。", [
+            { text: "初級", onClick: () => { window.hideModal(); game.startCPUGame(1); } },
+            { text: "中級", onClick: () => { window.hideModal(); game.startCPUGame(2); } },
+            { text: "上級", onClick: () => { window.hideModal(); game.startCPUGame(3); } },
+            { text: "閉じる", onClick: window.hideModal }
+        ]);
     });
 
     document.getElementById('menu-online').addEventListener('click', () => {
@@ -1637,11 +1777,8 @@ window.onload = async () => {
                 window.showModal("部屋に参加", "5文字のコードを入力してください。", [
                     { text: "入室", onClick: () => {
                         const code = document.getElementById('modal-input').value.toUpperCase();
-                        if (code.length === 5) {
-                            game.joinRoom(code);
-                        } else {
-                            window.showModal("入力エラー", "5文字で入力してください。", [{text: "OK", onClick: window.hideModal}]);
-                        }
+                        if (code.length === 5) game.joinRoom(code);
+                        else window.showModal("入力エラー", "5文字で入力してください。", [{text: "OK", onClick: window.hideModal}]);
                     }},
                     { text: "キャンセル", onClick: window.hideModal }
                 ], false, true);
