@@ -640,7 +640,7 @@ class Game {
 
     updateMessage(msg) {
         const msgEl = document.getElementById('message');
-        if (msgEl) {
+        if (msgEl && msgEl.innerText !== msg) {
             msgEl.innerText = msg;
         }
     }
@@ -653,7 +653,7 @@ class Game {
         this.updateMessage(msg);
         this.render();
         window.showModal(msg, "", [{text: "閉じる", onClick: window.hideModal}]);
-        this.syncState();
+        this.syncStateAsync();
     }
 
     initBoard(sync = true) {
@@ -710,7 +710,7 @@ class Game {
         this.render();
         
         if (sync && this.isOnline) {
-            this.syncState();
+            this.syncStateAsync();
         }
     }
 
@@ -819,7 +819,9 @@ class Game {
             }
             if (data.gameState && data.lastUpdateUserId !== uid) {
                 try {
-                    this.loadState(typeof data.gameState === 'string' ? JSON.parse(data.gameState) : data.gameState);
+                    const parsedState = typeof data.gameState === 'string' ? JSON.parse(data.gameState) : data.gameState;
+                    // UIカクつき防止のためrequestAnimationFrameで実行
+                    requestAnimationFrame(() => this.loadState(parsedState));
                 } catch(e) { console.error(e); }
             }
         });
@@ -833,7 +835,7 @@ class Game {
             window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「先手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
             this.initBoard(true);
         } else if (data.type === 'sync' && data.state) {
-            this.loadState(data.state);
+            requestAnimationFrame(() => this.loadState(data.state));
         }
     }
 
@@ -850,7 +852,7 @@ class Game {
         this.isGameOver = state.isGameOver;
         this.hasStarted = state.hasStarted;
         
-        if (this.hasStarted) this.clock.start();
+        if (this.hasStarted && !this.isGameOver) this.clock.start();
         else if (this.isGameOver) this.clock.stop();
         this.clock.switchTurn(this.turn);
         
@@ -861,8 +863,13 @@ class Game {
         this.render();
     }
 
-    async syncState() {
+    // UI描画をブロックしないように非同期でFirebaseへ送るラッパー
+    syncStateAsync() {
         if (!this.isOnline || !this.roomId) return;
+        setTimeout(() => this.syncState(), 0); 
+    }
+
+    async syncState() {
         const stateObj = { board: this.board, hands: this.hands, turn: this.turn, cards: this.cards, clockTime: this.clock.time, clockByoyomi: this.clock.inByoyomi, clockCurrentByoyomi: this.clock.currentByoyomi, lastMove: this.lastMove, moveCount: this.moveCount, isGameOver: this.isGameOver, hasStarted: this.hasStarted };
 
         if (!isFirebaseReady || !currentUser) {
@@ -970,12 +977,15 @@ class Game {
         if (kingX === -1) return true;
 
         const opponent = player === PLAYER ? OPPONENT : PLAYER;
+        // 処理最適化: 相手の駒で凍結されていないものを探す
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const p = this.board[y][x];
-                if (p && p.owner === opponent) {
+                if (p && p.owner === opponent && !p.frozen && p.type !== WALL) {
                     const moves = this.getRawMoves(x, y);
-                    if (moves.some(m => m.toX === kingX && m.toY === kingY)) return true;
+                    for (let i = 0; i < moves.length; i++) {
+                        if (moves[i].toX === kingX && moves[i].toY === kingY) return true;
+                    }
                 }
             }
         }
@@ -1026,7 +1036,8 @@ class Game {
         return false;
     }
 
-    getAllLegalMoves(player) {
+    // checkUchifuをfalseに設定することで、再帰による重い負荷を防ぐ（ラグ解消のコア部分）
+    getAllLegalMoves(player, checkUchifu = true) {
         let allMoves = [];
         
         for (let y = 0; y < 9; y++) {
@@ -1051,7 +1062,7 @@ class Game {
                         if (type === PAWN && this.isNifu(x, player)) continue;
                         if (this.hasNoPlaceToGo(type, y, player)) continue;
                         if (this.testMoveUnchecks({type: type}, {x, y}, player)) {
-                            if (type === PAWN && this.isUchifuZume(x, y, player)) continue;
+                            if (type === PAWN && checkUchifu && this.isUchifuZume(x, y, player)) continue;
                             allMoves.push({from: {type: type}, to: {x, y}});
                         }
                     }
@@ -1065,13 +1076,56 @@ class Game {
         this.board[y][x] = { type: PAWN, owner: player, promoted: false };
         const opponent = player === PLAYER ? OPPONENT : PLAYER;
         let isMate = false;
+        
+        // 歩を打ったことで王手になった場合のみ詰みか判定
         if (this.isInCheck(opponent)) {
-            const opMoves = this.getAllLegalMoves(opponent);
+            // falseを渡して再帰を浅くする（ラグ発生源のカット）
+            const opMoves = this.getAllLegalMoves(opponent, false);
             if (opMoves.length === 0) isMate = true;
         }
+        
         this.board[y][x] = null;
         return isMate;
     }
+
+    // 選択された駒「だけ」の合法手計算（クリックのたびに盤面全体の再計算をさせずUIを軽くする）
+    calcLegalMovesForSelected() {
+        this.legalMoves = [];
+        if (!this.selected) {
+            this.render();
+            return;
+        }
+        
+        const player = this.turn;
+        if (this.selected.type === 'board') {
+            const sx = this.selected.x, sy = this.selected.y;
+            const p = this.board[sy][sx];
+            if (p && p.owner === player) {
+                const rawMoves = this.getRawMoves(sx, sy);
+                for (const m of rawMoves) {
+                    if (this.testMoveUnchecks({x: sx, y: sy}, {x: m.toX, y: m.toY}, player)) {
+                        this.legalMoves.push({toX: m.toX, toY: m.toY});
+                    }
+                }
+            }
+        } else if (this.selected.type === 'hand') {
+            const type = this.selected.pieceType;
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        if (this.testMoveUnchecks({type: type}, {x, y}, player)) {
+                            if (type === PAWN && this.isUchifuZume(x, y, player)) continue;
+                            this.legalMoves.push({toX: x, toY: y});
+                        }
+                    }
+                }
+            }
+        }
+        this.render();
+    }
+
 
     handleClick(type, x, y, pieceType = null, cardIndex = null) {
         if (this.isGameOver) return;
@@ -1081,7 +1135,7 @@ class Game {
         if (!this.hasStarted) {
             this.hasStarted = true;
             this.clock.start();
-            if(this.isOnline) this.syncState();
+            if(this.isOnline) this.syncStateAsync();
         }
 
         if (type === 'card') {
@@ -1107,7 +1161,7 @@ class Game {
             if (!this.selected) {
                 if (clickedPiece && clickedPiece.owner === this.turn) {
                     this.selected = { type: 'board', x, y };
-                    this.calcLegalMovesForSelected();
+                    this.calcLegalMovesForSelected(); // ここが劇的に速くなりました
                 }
             } 
             else {
@@ -1209,20 +1263,6 @@ class Game {
         }
     }
 
-    calcLegalMovesForSelected() {
-        this.legalMoves = [];
-        if (!this.selected) return;
-        const allMoves = this.getAllLegalMoves(this.turn);
-        if (this.selected.type === 'board') {
-            const sx = this.selected.x, sy = this.selected.y;
-            this.legalMoves = allMoves.filter(m => m.from.x === sx && m.from.y === sy).map(m => ({toX: m.to.x, toY: m.to.y}));
-        } else if (this.selected.type === 'hand') {
-            const pt = this.selected.pieceType;
-            this.legalMoves = allMoves.filter(m => m.from.type === pt).map(m => ({toX: m.to.x, toY: m.to.y}));
-        }
-        this.render();
-    }
-
     isEnemyTerritory(y, player) { return player === PLAYER ? y <= 2 : y >= 6; }
 
     canPromote(move, player) {
@@ -1308,7 +1348,7 @@ class Game {
             this.isGameOver = true;
             this.render();
             window.showModal("決着", msg, [{text: "閉じる", onClick: window.hideModal}]);
-            this.syncState();
+            this.syncStateAsync();
             return;
         }
 
@@ -1335,7 +1375,8 @@ class Game {
         }
 
         if (this.isOnline) {
-            this.syncState();
+            // UIを停止させず、ブラウザの描画が終わった直後に非同期でFirebaseと通信
+            this.syncStateAsync();
         }
 
         // CPUのターン
@@ -1579,25 +1620,22 @@ class Game {
             return minScore;
         }
     }
-    // --- 描画 ---
+
+    // --- 描画（UIを劇的に軽くするための最適化済み） ---
     render() {
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const cell = this.cells[y][x];
-                cell.className = 'cell';
-
-                if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) {
-                    cell.classList.add('selected');
-                }
-                if (this.lastMove && ((this.lastMove.from.type === 'board' && this.lastMove.from.x === x && this.lastMove.from.y === y) || (this.lastMove.to.x === x && this.lastMove.to.y === y))) {
-                    cell.classList.add('last-move');
-                }
-                if (this.legalMoves.some(m => m.toX === x && m.toY === y)) {
-                    cell.classList.add('highlight');
-                }
+                
+                // 強制的な再描画（Reflow）を防ぐため、必要な場合のみクラスを更新
+                let cClasses = 'cell';
+                if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) cClasses += ' selected';
+                if (this.lastMove && ((this.lastMove.from.type === 'board' && this.lastMove.from.x === x && this.lastMove.from.y === y) || (this.lastMove.to.x === x && this.lastMove.to.y === y))) cClasses += ' last-move';
+                if (this.legalMoves.some(m => m.toX === x && m.toY === y)) cClasses += ' highlight';
+                if (cell.className !== cClasses) cell.className = cClasses;
 
                 const piece = this.board[y][x];
-                let pieceEl = cell.querySelector('.piece');
+                let pieceEl = cell.firstChild;
 
                 if (piece) {
                     if (piece.shielded) cell.classList.add('shielded-cell');
@@ -1609,18 +1647,17 @@ class Game {
                         cell.appendChild(pieceEl);
                     }
                     
-                    pieceEl.className = 'piece';
-                    if (piece.owner === OPPONENT) pieceEl.classList.add('opponent-piece');
-                    if (piece.promoted) pieceEl.classList.add('promoted');
+                    let pClasses = 'piece';
+                    if (piece.owner === OPPONENT) pClasses += ' opponent-piece';
+                    if (piece.promoted) pClasses += ' promoted';
+                    if (piece.type === WALL) pClasses += ' wall';
+
+                    if (pieceEl.className !== pClasses) pieceEl.className = pClasses;
                     
-                    if (piece.type === WALL) {
-                        pieceEl.innerText = '壁';
-                        pieceEl.classList.add('wall');
-                    } else {
-                        let pStr = pieceStrs[piece.type][piece.promoted ? 1 : 0];
-                        if(piece.type === KING && piece.owner === OPPONENT) pStr = '王';
-                        pieceEl.innerText = pStr;
-                    }
+                    let pStr = piece.type === WALL ? '壁' : pieceStrs[piece.type][piece.promoted ? 1 : 0];
+                    if (piece.type === KING && piece.owner === OPPONENT) pStr = '王';
+                    
+                    if (pieceEl.innerText !== pStr) pieceEl.innerText = pStr;
                 } else {
                     if (pieceEl) cell.removeChild(pieceEl);
                 }
