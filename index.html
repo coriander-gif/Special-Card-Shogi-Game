@@ -618,6 +618,8 @@ class Game {
         // CPUモード関連
         this.cpuLevel = null; // null(OFF), 1(初級), 2(中級), 3(上級)
         
+        this.allLegalMovesCache = []; // 合法手の事前計算キャッシュ
+        
         this.initBoardDOM();
         this.initBoard();
     }
@@ -705,6 +707,9 @@ class Game {
             oppLabel.innerText = "後手";
             oppName.innerText = "後手";
         }
+
+        // 初期状態のキャッシュ作成
+        this.allLegalMovesCache = this.getAllLegalMoves(this.turn);
 
         this.updateMessage("先手の番です");
         this.render();
@@ -860,6 +865,12 @@ class Game {
         this.selected = null;
         this.legalMoves = [];
         this.targetingCard = null;
+        
+        // キャッシュを更新
+        if (!this.isGameOver) {
+            this.allLegalMovesCache = this.getAllLegalMoves(this.turn);
+        }
+
         this.render();
     }
 
@@ -909,13 +920,13 @@ class Game {
         const p = piece.promoted;
         const dir = piece.owner === PLAYER ? -1 : 1;
 
-        if (type === KING) return [[-1,-1], [0,-1], [1,-1], [-1,0], [1,0], [-1,1], [0,1], [1,1]].map(d => ({dx: d[0], dy: d[1]}));
+        if (type === KING) return [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}];
         if (type === GOLD || (p && [PAWN, LANCE, KNIGHT, SILVER].includes(type))) {
-            return [[-1,dir], [0,dir], [1,dir], [-1,0], [1,0], [0,-dir]].map(d => ({dx: d[0], dy: d[1]}));
+            return [{dx:-1,dy:dir}, {dx:0,dy:dir}, {dx:1,dy:dir}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:-dir}];
         }
         if (type === PAWN) return [{dx: 0, dy: dir}];
         if (type === KNIGHT) return [{dx: -1, dy: dir*2}, {dx: 1, dy: dir*2}];
-        if (type === SILVER) return [[-1,dir], [0,dir], [1,dir], [-1,-dir], [1,-dir]].map(d => ({dx: d[0], dy: d[1]}));
+        if (type === SILVER) return [{dx:-1,dy:dir}, {dx:0,dy:dir}, {dx:1,dy:dir}, {dx:-1,dy:-dir}, {dx:1,dy:-dir}];
         if (type === LANCE) return [{dx: 0, dy: dir, slide: true}];
         
         let moves = [];
@@ -1036,9 +1047,9 @@ class Game {
         return false;
     }
 
-    // checkUchifuをfalseに設定することで、再帰による重い負荷を防ぐ（ラグ解消のコア部分）
     getAllLegalMoves(player, checkUchifu = true) {
         let allMoves = [];
+        const inCheck = this.isInCheck(player);
         
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
@@ -1061,7 +1072,14 @@ class Game {
                     if (this.board[y][x] === null) {
                         if (type === PAWN && this.isNifu(x, player)) continue;
                         if (this.hasNoPlaceToGo(type, y, player)) continue;
-                        if (this.testMoveUnchecks({type: type}, {x, y}, player)) {
+                        
+                        // 王手されていないなら、持ち駒を打つ手は無条件で安全（計算量の大幅削減）
+                        let isSafe = true;
+                        if (inCheck) {
+                            isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
+                        }
+                        
+                        if (isSafe) {
                             if (type === PAWN && checkUchifu && this.isUchifuZume(x, y, player)) continue;
                             allMoves.push({from: {type: type}, to: {x, y}});
                         }
@@ -1088,7 +1106,7 @@ class Game {
         return isMate;
     }
 
-    // 選択された駒「だけ」の合法手計算（クリックのたびに盤面全体の再計算をさせずUIを軽くする）
+    // 選択された駒「だけ」の合法手計算（キャッシュから取り出すだけのO(1)処理に最適化）
     calcLegalMovesForSelected() {
         this.legalMoves = [];
         if (!this.selected) {
@@ -1096,32 +1114,16 @@ class Game {
             return;
         }
         
-        const player = this.turn;
         if (this.selected.type === 'board') {
             const sx = this.selected.x, sy = this.selected.y;
-            const p = this.board[sy][sx];
-            if (p && p.owner === player) {
-                const rawMoves = this.getRawMoves(sx, sy);
-                for (const m of rawMoves) {
-                    if (this.testMoveUnchecks({x: sx, y: sy}, {x: m.toX, y: m.toY}, player)) {
-                        this.legalMoves.push({toX: m.toX, toY: m.toY});
-                    }
-                }
-            }
+            this.legalMoves = this.allLegalMovesCache
+                .filter(m => m.from.x === sx && m.from.y === sy)
+                .map(m => ({toX: m.to.x, toY: m.to.y}));
         } else if (this.selected.type === 'hand') {
             const type = this.selected.pieceType;
-            for (let y = 0; y < 9; y++) {
-                for (let x = 0; x < 9; x++) {
-                    if (this.board[y][x] === null) {
-                        if (type === PAWN && this.isNifu(x, player)) continue;
-                        if (this.hasNoPlaceToGo(type, y, player)) continue;
-                        if (this.testMoveUnchecks({type: type}, {x, y}, player)) {
-                            if (type === PAWN && this.isUchifuZume(x, y, player)) continue;
-                            this.legalMoves.push({toX: x, toY: y});
-                        }
-                    }
-                }
-            }
+            this.legalMoves = this.allLegalMovesCache
+                .filter(m => m.from.type === type)
+                .map(m => ({toX: m.to.x, toY: m.to.y}));
         }
         this.render();
     }
@@ -1339,6 +1341,7 @@ class Game {
 
         const nextPlayer = this.turn === PLAYER ? OPPONENT : PLAYER;
         const nextMoves = this.getAllLegalMoves(nextPlayer);
+        this.allLegalMovesCache = nextMoves; // 次のターンの合法手をキャッシュ
         
         if (nextMoves.length === 0) {
             this.clock.stop();
