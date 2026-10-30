@@ -444,6 +444,36 @@ const ROOK = 7;
 const KING = 8;
 const WALL = 99;
 
+// 駒の移動方向（キャッシュ用、GC対策でメモリ負荷をゼロに）
+const MOVE_DIRS = {
+    KING: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}],
+    PAWN: { 0: [{dx: 0, dy: -1}], 1: [{dx: 0, dy: 1}] },
+    KNIGHT: { 0: [{dx: -1, dy: -2}, {dx: 1, dy: -2}], 1: [{dx: -1, dy: 2}, {dx: 1, dy: 2}] },
+    SILVER: { 
+        0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:1}, {dx:1,dy:1}],
+        1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:-1}, {dx:1,dy:-1}]
+    },
+    GOLD: {
+        0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:1}],
+        1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:-1}]
+    },
+    LANCE: { 0: [{dx: 0, dy: -1, slide: true}], 1: [{dx: 0, dy: 1, slide: true}] },
+    BISHOP: [{dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}],
+    ROOK: [{dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true}],
+    PRO_BISHOP: [
+        {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true},
+        {dx:0, dy:-1}, {dx:0, dy:1}, {dx:-1, dy:0}, {dx:1, dy:0}
+    ],
+    PRO_ROOK: [
+        {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
+        {dx:-1, dy:-1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:1, dy:1}
+    ],
+    IDATEN: [
+        {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
+        {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}
+    ]
+};
+
 // カード効果
 const CARD_STEAL = '強奪';
 const CARD_WALL = '壁設置';
@@ -916,60 +946,80 @@ class Game {
     }
 
     getPieceMovement(piece) {
+        if (piece.idaten) return MOVE_DIRS.IDATEN;
         const type = piece.type;
         const p = piece.promoted;
-        const dir = piece.owner === PLAYER ? -1 : 1;
+        const o = piece.owner;
 
-        if (type === KING) return [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}];
-        if (type === GOLD || (p && [PAWN, LANCE, KNIGHT, SILVER].includes(type))) {
-            return [{dx:-1,dy:dir}, {dx:0,dy:dir}, {dx:1,dy:dir}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:-dir}];
+        if (type === KING) return MOVE_DIRS.KING;
+        if (type === GOLD || (p && (type === PAWN || type === LANCE || type === KNIGHT || type === SILVER))) return MOVE_DIRS.GOLD[o];
+        if (type === PAWN) return MOVE_DIRS.PAWN[o];
+        if (type === KNIGHT) return MOVE_DIRS.KNIGHT[o];
+        if (type === SILVER) return MOVE_DIRS.SILVER[o];
+        if (type === LANCE) return MOVE_DIRS.LANCE[o];
+        if (type === BISHOP) return p ? MOVE_DIRS.PRO_BISHOP : MOVE_DIRS.BISHOP;
+        if (type === ROOK) return p ? MOVE_DIRS.PRO_ROOK : MOVE_DIRS.ROOK;
+        return [];
+    }
+
+    canAttackTarget(fromX, fromY, piece, targetX, targetY) {
+        if (piece.frozen || piece.type === WALL) return false;
+
+        const movements = this.getPieceMovement(piece);
+        for (let i = 0; i < movements.length; i++) {
+            const move = movements[i];
+            if (move.slide) {
+                let cx = fromX + move.dx;
+                let cy = fromY + move.dy;
+                while (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    if (cx === targetX && cy === targetY) return true;
+                    const p = this.board[cy][cx];
+                    if (p !== null) break; 
+                    cx += move.dx;
+                    cy += move.dy;
+                }
+            } else {
+                if (fromX + move.dx === targetX && fromY + move.dy === targetY) return true;
+            }
         }
-        if (type === PAWN) return [{dx: 0, dy: dir}];
-        if (type === KNIGHT) return [{dx: -1, dy: dir*2}, {dx: 1, dy: dir*2}];
-        if (type === SILVER) return [{dx:-1,dy:dir}, {dx:0,dy:dir}, {dx:1,dy:dir}, {dx:-1,dy:-dir}, {dx:1,dy:-dir}];
-        if (type === LANCE) return [{dx: 0, dy: dir, slide: true}];
-        
-        let moves = [];
-        if (type === BISHOP || p) {
-            moves.push({dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true});
-            if (p) moves.push({dx:0, dy:-1}, {dx:0, dy:1}, {dx:-1, dy:0}, {dx:1, dy:0});
-        }
-        if (type === ROOK || p) {
-            moves.push({dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true});
-            if (p) moves.push({dx:-1, dy:-1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:1, dy:1});
-        }
-        return moves;
+        return false;
     }
 
     getRawMoves(x, y) {
         const piece = this.board[y][x];
-        if (!piece) return [];
-        if (piece.frozen) return [];
+        if (!piece || piece.frozen || piece.type === WALL) return [];
 
-        let movements = this.getPieceMovement(piece);
-        if (piece.idaten) {
-            movements = [
-                {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
-                {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}
-            ];
-        }
-
+        const movements = this.getPieceMovement(piece);
         let moves = [];
-        for (const move of movements) {
+        for (let i = 0; i < movements.length; i++) {
+            const move = movements[i];
             if (move.slide) {
                 let cx = x + move.dx;
                 let cy = y + move.dy;
-                while (this.canMoveTo(cx, cy, piece.owner)) {
-                    moves.push({toX: cx, toY: cy});
-                    if (this.board[cy][cx] !== null) break;
+                while (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    const p = this.board[cy][cx];
+                    if (p && p.type === WALL) break;
+                    if (p && p.owner !== piece.owner && p.shielded) break;
+                    
+                    if (p === null || p.owner !== piece.owner) {
+                        moves.push({toX: cx, toY: cy});
+                    }
+                    if (p !== null) break;
+                    
                     cx += move.dx;
                     cy += move.dy;
                 }
             } else {
                 let cx = x + move.dx;
                 let cy = y + move.dy;
-                if (this.canMoveTo(cx, cy, piece.owner)) {
-                    moves.push({toX: cx, toY: cy});
+                if (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    const p = this.board[cy][cx];
+                    if (p && p.type === WALL) continue;
+                    if (p && p.owner !== piece.owner && p.shielded) continue;
+
+                    if (p === null || p.owner !== piece.owner) {
+                        moves.push({toX: cx, toY: cy});
+                    }
                 }
             }
         }
@@ -988,15 +1038,12 @@ class Game {
         if (kingX === -1) return true;
 
         const opponent = player === PLAYER ? OPPONENT : PLAYER;
-        // 処理最適化: 相手の駒で凍結されていないものを探す
+        // 処理最適化: 王に利いている敵駒を逆算して直接探す（超高速化）
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const p = this.board[y][x];
                 if (p && p.owner === opponent && !p.frozen && p.type !== WALL) {
-                    const moves = this.getRawMoves(x, y);
-                    for (let i = 0; i < moves.length; i++) {
-                        if (moves[i].toX === kingX && moves[i].toY === kingY) return true;
-                    }
+                    if (this.canAttackTarget(x, y, p, kingX, kingY)) return true;
                 }
             }
         }
@@ -1339,13 +1386,27 @@ class Game {
             }
         }
 
-        const nextPlayer = this.turn === PLAYER ? OPPONENT : PLAYER;
-        const nextMoves = this.getAllLegalMoves(nextPlayer);
+        // --- UIの即時反映と非同期処理への分離（カクつきゼロ化） ---
+        this.moveCount++;
+        this.turn = this.turn === PLAYER ? OPPONENT : PLAYER;
+        
+        this.render(); // コマ移動直後の状態を「即座に」描画
+        
+        if (this.isOnline) {
+            this.syncStateAsync();
+        }
+
+        // 詰み判定やAIの思考など重い処理をUIレンダリングの後に回す
+        setTimeout(() => this.postTurnProcessing(), 10);
+    }
+
+    postTurnProcessing() {
+        const nextMoves = this.getAllLegalMoves(this.turn);
         this.allLegalMovesCache = nextMoves; // 次のターンの合法手をキャッシュ
         
         if (nextMoves.length === 0) {
             this.clock.stop();
-            const winner = this.turn === PLAYER ? "先手" : "後手";
+            const winner = this.turn === PLAYER ? "後手" : "先手";
             let msg = `${winner}の勝ちです！(詰み)`;
             this.updateMessage(msg);
             this.isGameOver = true;
@@ -1355,7 +1416,6 @@ class Game {
             return;
         }
 
-        this.moveCount++;
         let modalTriggered = false;
         if (this.moveCount % 10 === 0) {
             this.cards[PLAYER].push(CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)]);
@@ -1363,13 +1423,12 @@ class Game {
             modalTriggered = true;
         }
 
-        if (this.isInCheck(nextPlayer)) {
+        if (this.isInCheck(this.turn)) {
             this.updateMessage("王手！");
         } else if (!this.targetingCard) {
-            this.updateMessage(nextPlayer === PLAYER ? "先手の番です" : "後手の番です");
+            this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
         }
 
-        this.turn = nextPlayer;
         this.clock.switchTurn(this.turn);
         this.render();
 
@@ -1377,14 +1436,9 @@ class Game {
             window.showModal("カード支給", "📜 計10手経過！両者に特殊カード支給！", [{text: "確認", onClick: window.hideModal}]);
         }
 
-        if (this.isOnline) {
-            // UIを停止させず、ブラウザの描画が終わった直後に非同期でFirebaseと通信
-            this.syncStateAsync();
-        }
-
         // CPUのターン
         if (this.cpuLevel && this.turn === OPPONENT && !this.isGameOver) {
-            setTimeout(() => this.cpuThink(), 500); // 演出のタメ
+            setTimeout(() => this.cpuThink(), 300); // UI更新を挟むためのディレイ
         }
     }
 
