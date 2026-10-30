@@ -1718,10 +1718,10 @@ window.showCardHelp = function(player = PLAYER) {
     const helpHTML = `
         <div class="text-left text-sm space-y-3 text-[#4a3623] max-w-sm mt-2">
             <p><strong>【強奪】</strong><br>相手の持ち駒からランダムに1つ奪います。</p>
-            <p><strong>【氷結】</strong><br>指定した敵の駒1つを、次の相手ターン終了時まで移動不可にします。</p>
-            <p><strong>【盾】</strong><br>指定した味方の駒1つを、1ターンの間相手がその駒を取れなくなります。</p>
-            <p><strong>【韋駄天】</strong><br>指定した味方の駒1つが、1ターンの間「飛車＋角行」の動きになります。</p>
-            <p><strong>【壁設置】</strong><br>空きマスに移動・通過不可の「壁」を設置します（4手で消滅）。</p>
+            <p><strong>【氷結】</strong><br>指定した敵の駒1つを、次の相手ターン終了時まで<br>移動不可にします。</p>
+            <p><strong>【盾】</strong><br>指定した味方の駒1つを、1ターンの間相手がその駒を<br>取れなくなります。</p>
+            <p><strong>【韋駄天】</strong><br>指定した味方の駒1つが、1ターンの間「飛車＋角行」の<br>動きになります。</p>
+            <p><strong>【壁設置】</strong><br>空きマスに移動・通過不可の「壁」を設置します<br>（4手で消滅）。</p>
         </div>
     `;
     window.showModal("特殊カードの効果", helpHTML, [{text: "閉じる", onClick: window.hideModal}], player === OPPONENT);
