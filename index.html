@@ -426,7 +426,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getDatabase, ref, set, get, update, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
 // --- 定数定義 ---
 const PLAYER = 0; // 先手 (下側)
@@ -444,7 +444,7 @@ const ROOK = 7;
 const KING = 8;
 const WALL = 99;
 
-// 駒の移動方向（キャッシュ用、GC対策でメモリ負荷をゼロに）
+// 駒の移動方向
 const MOVE_DIRS = {
     KING: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}],
     PAWN: { 0: [{dx: 0, dy: -1}], 1: [{dx: 0, dy: 1}] },
@@ -498,6 +498,7 @@ let analytics = null;
 const firebaseConfig = {
   apiKey: "AIzaSyBcvkE1KUfkKiPYf3DdiyQh1D556068Nss",
   authDomain: "special-card-shogi-game.firebaseapp.com",
+  databaseURL: "https://special-card-shogi-game-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "special-card-shogi-game",
   storageBucket: "special-card-shogi-game.firebasestorage.app",
   messagingSenderId: "292188538308",
@@ -513,7 +514,7 @@ async function initFirebase() {
         try {
             analytics = getAnalytics(app);
         } catch(e) { }
-        db = getFirestore(app);
+        db = getDatabase(app);
         auth = getAuth(app);
         
         let cred;
@@ -644,6 +645,7 @@ class Game {
         this.myRole = null;
         this.unsubscribe = null;
         this.bc = null;
+        this.pendingAction = null; // ★ 送信予定のアクションを保持する変数
         
         // CPUモード関連
         this.cpuLevel = null; // null(OFF), 1(初級), 2(中級), 3(上級)
@@ -675,15 +677,20 @@ class Game {
         }
     }
 
-    handleTimeUp(player) {
+    handleTimeUp(player, isRemote = false) {
         this.isGameOver = true;
+        this.clock.stop();
         const loser = player === PLAYER ? "先手" : "後手";
         const winner = player === PLAYER ? "後手" : "先手";
         let msg = `時間切れにより、${winner}の勝ちです！`;
         this.updateMessage(msg);
         this.render();
         window.showModal(msg, "", [{text: "閉じる", onClick: window.hideModal}]);
-        this.syncStateAsync();
+        
+        // 自分がタイムアウトした時だけアクションとして送信
+        if (!isRemote) {
+            this.sendActionAsync({ type: 'timeout', player });
+        }
     }
 
     initBoard(sync = true) {
@@ -698,6 +705,7 @@ class Game {
         this.moveCount = 0;
         this.cards = { [PLAYER]: [], [OPPONENT]: [] };
         this.targetingCard = null;
+        this.pendingAction = null;
         this.clock.reset();
 
         const initialLayout = [
@@ -724,7 +732,7 @@ class Game {
             }
         }
         
-        this.initKingPositions(); // 王の位置をキャッシュ化（超高速化のため）
+        this.initKingPositions();
         
         // ラベル更新
         const oppLabel = document.getElementById('opponent-label');
@@ -773,9 +781,11 @@ class Game {
         }
 
         const uid = currentUser.uid;
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
+        const roomRef = ref(db, 'rooms/' + this.roomId);
         try {
-            await setDoc(roomRef, { status: 'waiting', host: uid, guest: null, roles: {}, gameState: null, lastUpdateUserId: uid, createdAt: new Date().getTime() });
+            await set(roomRef, { status: 'waiting', host: uid, guest: null, roles: {}, gameState: null, lastUpdateUserId: uid, createdAt: new Date().getTime() });
+            onDisconnect(roomRef).remove(); // 接続が切れたら自動で部屋を解散
+            
             this.listenToRoom();
             document.getElementById('online-status').style.display = 'block';
             document.getElementById('room-code-display').innerText = this.roomId;
@@ -806,17 +816,17 @@ class Game {
             return;
         }
 
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+        const roomRef = ref(db, 'rooms/' + code);
         try {
-            const docSnap = await getDoc(roomRef);
-            if (docSnap.exists() && docSnap.data().status === 'waiting') {
+            const docSnap = await get(roomRef);
+            if (docSnap.exists() && docSnap.val().status === 'waiting') {
                 this.roomId = code;
                 this.isOnline = true;
                 this.cpuLevel = null;
                 const hostRole = Math.random() < 0.5 ? PLAYER : OPPONENT;
                 const guestRole = hostRole === PLAYER ? OPPONENT : PLAYER;
                 const uid = currentUser.uid;
-                await updateDoc(roomRef, { status: 'playing', guest: uid, roles: { [docSnap.data().host]: hostRole, [uid]: guestRole } });
+                await update(roomRef, { status: 'playing', guest: uid, roles: { [docSnap.val().host]: hostRole, [uid]: guestRole } });
                 this.listenToRoom();
                 document.getElementById('online-status').style.display = 'block';
                 document.getElementById('room-code-display').innerText = this.roomId;
@@ -832,16 +842,16 @@ class Game {
     listenToRoom() {
         if (this.unsubscribe) this.unsubscribe();
         if (!isFirebaseReady || !currentUser) return;
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
+        const roomRef = ref(db, 'rooms/' + this.roomId);
         const uid = currentUser.uid;
         
-        this.unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists()) {
+        this.unsubscribe = onValue(roomRef, (snapshot) => {
+            if (!snapshot.exists()) {
                 this.exitOnline();
                 window.showModal("切断", "部屋が解散されました。", [{text: "OK", onClick: window.hideModal}]);
                 return;
             }
-            const data = docSnap.data();
+            const data = snapshot.val();
             if (data.status === 'playing' && this.myRole === null) {
                 this.myRole = data.roles[uid] !== undefined ? data.roles[uid] : OPPONENT;
                 document.getElementById('my-role-display').innerText = (this.myRole === PLAYER ? '先手' : '後手');
@@ -849,7 +859,15 @@ class Game {
                 window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「${this.myRole === PLAYER ? '先手' : '後手'}」です。`, [{text: "対局開始", onClick: window.hideModal}]);
                 if (data.host === uid) this.initBoard(true);
             }
-            if (data.gameState && data.lastUpdateUserId !== uid) {
+            
+            // ★ フル同期ではなく、アクション（指し手）の差分を受信して実行
+            if (data.lastAction && data.lastUpdateUserId !== uid) {
+                if (data.lastAction.moveCount > this.moveCount) {
+                    this.playAction(data.lastAction);
+                }
+            } 
+            // 参加直後の初期盤面の同期時のみフルデータを使用
+            else if (data.gameState && data.lastUpdateUserId !== uid && this.moveCount === 0) {
                 try {
                     const parsedState = typeof data.gameState === 'string' ? JSON.parse(data.gameState) : data.gameState;
                     const decompressed = this.decompressState(parsedState);
@@ -866,7 +884,10 @@ class Game {
             window.hideModal();
             window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「先手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
             this.initBoard(true);
-        } else if (data.type === 'sync' && data.state) {
+        } else if (data.type === 'action' && data.action && data.action.moveCount > this.moveCount) {
+            // ローカルでも差分のアクションを実行
+            this.playAction(data.action);
+        } else if (data.type === 'sync' && data.state && this.moveCount === 0) {
             const decompressed = this.decompressState(data.state);
             this.loadState(decompressed);
         }
@@ -894,22 +915,62 @@ class Game {
         this.legalMoves = [];
         this.targetingCard = null;
         
-        this.initKingPositions(); // 受信時にも王の位置をキャッシュ
+        this.initKingPositions();
 
         this.render();
     }
 
-    initKingPositions() {
-        this.kingPos = { [PLAYER]: null, [OPPONENT]: null };
-        for (let y = 0; y < 9; y++) {
-            for (let x = 0; x < 9; x++) {
-                const p = this.board[y][x];
-                if (p && p.type === KING) this.kingPos[p.owner] = {x, y};
+    // ★ 差分データ（指し手・カード使用）のみを送信する超軽量メソッド
+    sendActionAsync(action) {
+        if (!this.isOnline || !this.roomId) return;
+        
+        const actionData = {
+            ...action,
+            moveCount: this.moveCount,
+            clock: {
+                time: this.clock.time,
+                inByoyomi: this.clock.inByoyomi,
+                currentByoyomi: this.clock.currentByoyomi
+            }
+        };
+
+        if (!isFirebaseReady || !currentUser) {
+            if (this.bc) this.bc.postMessage({ type: 'action', action: actionData });
+            return;
+        }
+
+        const roomRef = ref(db, 'rooms/' + this.roomId);
+        try { 
+            update(roomRef, { lastAction: actionData, lastUpdateUserId: currentUser.uid }); 
+        } catch(e) {}
+    }
+
+    // ★ 受信した相手の指し手やカード使用を自分の画面で自動再生する
+    playAction(actionData) {
+        if (this.isGameOver) return;
+        
+        // 時計のズレを同期
+        this.clock.time = actionData.clock.time;
+        this.clock.inByoyomi = actionData.clock.inByoyomi;
+        this.clock.currentByoyomi = actionData.clock.currentByoyomi;
+
+        if (actionData.type === 'timeout') {
+            this.handleTimeUp(actionData.player, true);
+        } else if (actionData.type === 'move') {
+            const { from, to, promote } = actionData.move;
+            // autoPromote を渡すことで、受信側では「成りますか？」のモーダルを出さずに自動で進める
+            this.executeMove(from, to, promote);
+        } else if (actionData.type === 'card') {
+            const { cardType, player, cardIndex, target, rIdx } = actionData;
+            if (cardType === CARD_STEAL) {
+                this.useCard(player, cardIndex, true, rIdx);
+            } else {
+                this.targetingCard = { card: cardType, player, index: cardIndex };
+                this.resolveCardTarget(target.x, target.y, true);
             }
         }
     }
 
-    // UI描画をブロックしないように非同期でFirebaseへ送るラッパー
     syncStateAsync() {
         if (!this.isOnline || !this.roomId) return;
         setTimeout(() => this.syncState(), 0); 
@@ -961,8 +1022,8 @@ class Game {
             return;
         }
 
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
-        try { await updateDoc(roomRef, { gameState: JSON.stringify(compressed), lastUpdateUserId: currentUser.uid }); } catch(e) {}
+        const roomRef = ref(db, 'rooms/' + this.roomId);
+        try { await update(roomRef, { gameState: JSON.stringify(compressed), lastUpdateUserId: currentUser.uid }); } catch(e) {}
     }
 
     exitOnline() {
@@ -1012,9 +1073,9 @@ class Game {
         for (let i = 0; i < movements.length; i++) {
             const move = movements[i];
             if (move.slide) {
-                // 幾何学的な枝刈り（絶対に行けない方向はループすら回さない：計算量劇的削減）
-                if (move.dx !== 0 && Math.sign(targetX - fromX) !== move.dx) continue;
-                if (move.dy !== 0 && Math.sign(targetY - fromY) !== move.dy) continue;
+                // 方向のチェックを数学的な掛け算に置き換え、劇的に高速化
+                if (move.dx !== 0 && (targetX - fromX) * move.dx <= 0) continue;
+                if (move.dy !== 0 && (targetY - fromY) * move.dy <= 0) continue;
                 if (move.dx === 0 && targetX !== fromX) continue;
                 if (move.dy === 0 && targetY !== fromY) continue;
                 if (move.dx !== 0 && move.dy !== 0 && Math.abs(targetX - fromX) !== Math.abs(targetY - fromY)) continue;
@@ -1082,7 +1143,6 @@ class Game {
         const {x: kingX, y: kingY} = kPos;
 
         const opponent = player === PLAYER ? OPPONENT : PLAYER;
-        // 盤面全走査ではなく、キャッシュした王の位置に対して直接判定
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const p = this.board[y][x];
@@ -1136,7 +1196,18 @@ class Game {
         return false;
     }
 
-    // 1つでも合法手があれば即座にtrueを返す超高速関数（打ち歩詰め判定のラグ解消用）
+    // ★修正部分：ここで呼び出されていた関数が存在せずエラーで止まっていました
+    hasNoPlaceToGo(type, y, player) {
+        if (player === PLAYER) {
+            if (type === PAWN || type === LANCE) return y === 0;
+            if (type === KNIGHT) return y <= 1;
+        } else {
+            if (type === PAWN || type === LANCE) return y === 8;
+            if (type === KNIGHT) return y >= 7;
+        }
+        return false;
+    }
+
     hasAnyLegalMove(player, checkUchifu = false) {
         const inCheck = this.isInCheck(player);
         for (let y = 0; y < 9; y++) {
@@ -1198,7 +1269,6 @@ class Game {
                         if (type === PAWN && this.isNifu(x, player)) continue;
                         if (this.hasNoPlaceToGo(type, y, player)) continue;
                         
-                        // 王手されていないなら、持ち駒を打つ手は無条件で安全（計算量の大幅削減）
                         let isSafe = true;
                         if (inCheck) {
                             isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
@@ -1220,9 +1290,7 @@ class Game {
         const opponent = player === PLAYER ? OPPONENT : PLAYER;
         let isMate = false;
         
-        // 歩を打ったことで王手になった場合のみ詰みか判定
         if (this.isInCheck(opponent)) {
-            // hasAnyLegalMoveで1手でも逃げ道があれば即終了（超高速化）
             if (!this.hasAnyLegalMove(opponent, false)) {
                 isMate = true;
             }
@@ -1232,7 +1300,6 @@ class Game {
         return isMate;
     }
 
-    // 選択された駒「だけ」の合法手計算（オンデマンド処理によるフリーズ完全解消）
     calcLegalMovesForSelected() {
         this.legalMoves = [];
         if (!this.selected) {
@@ -1280,7 +1347,7 @@ class Game {
     handleClick(type, x, y, pieceType = null, cardIndex = null) {
         if (this.isGameOver) return;
         if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) return;
-        if (this.cpuLevel && this.turn === OPPONENT) return; // CPU思考中はクリック無視
+        if (this.cpuLevel && this.turn === OPPONENT) return;
 
         if (!this.hasStarted) {
             this.hasStarted = true;
@@ -1311,7 +1378,7 @@ class Game {
             if (!this.selected) {
                 if (clickedPiece && clickedPiece.owner === this.turn) {
                     this.selected = { type: 'board', x, y };
-                    this.calcLegalMovesForSelected(); // ここが劇的に速くなりました
+                    this.calcLegalMovesForSelected();
                 }
             } 
             else {
@@ -1343,39 +1410,51 @@ class Game {
         }
     }
 
-    useCard(player, cardIndex) {
+    // isRemote と rIdx (強奪のランダム対象) を受け取るように変更
+    useCard(player, cardIndex, isRemote = false, rIdx = -1) {
         const card = this.cards[player][cardIndex];
         if (card === CARD_STEAL) {
             const opp = player === PLAYER ? OPPONENT : PLAYER;
             if (this.hands[opp].length === 0) {
-                this.updateMessage("相手の持駒がないため「強奪」は使用できません");
+                if (!isRemote) this.updateMessage("相手の持駒がないため「強奪」は使用できません");
                 return;
             }
 
-            const rIdx = Math.floor(Math.random() * this.hands[opp].length);
-            const stolen = this.hands[opp].splice(rIdx, 1)[0];
+            const stealIdx = isRemote ? rIdx : Math.floor(Math.random() * this.hands[opp].length);
+            const stolen = this.hands[opp].splice(stealIdx, 1)[0];
             this.hands[player].push(stolen);
-            let msg = `${card}発動！相手の駒を奪いました`;
+            let msg = isRemote ? `相手が「強奪」を発動しました` : `${card}発動！相手の駒を奪いました`;
+            
+            // アクションとして記録
+            if (!isRemote) this.pendingAction = { type: 'card', cardType: CARD_STEAL, player, cardIndex, rIdx: stealIdx };
+            
             this.cards[player].splice(cardIndex, 1);
             this.render();
-            window.showModal(msg, "", [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
+            
+            if (!isRemote) {
+                window.showModal(msg, "", [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
+            } else {
+                this.endTurn();
+            }
         } else {
             this.targetingCard = { card, player, index: cardIndex };
             this.selected = null;
             this.legalMoves = [];
             
-            let msg = "";
-            if (card === CARD_WALL) msg = "壁を設置する空きマスを選択してください";
-            if (card === CARD_FREEZE) msg = "氷結させる敵の駒を選択してください";
-            if (card === CARD_SHIELD) msg = "盾を付与する味方の駒を選択してください";
-            if (card === CARD_IDATEN) msg = "韋駄天にする味方の駒を選択してください";
-            
-            this.updateMessage(msg);
-            this.render();
+            if (!isRemote) {
+                let msg = "";
+                if (card === CARD_WALL) msg = "壁を設置する空きマスを選択してください";
+                if (card === CARD_FREEZE) msg = "氷結させる敵の駒を選択してください";
+                if (card === CARD_SHIELD) msg = "盾を付与する味方の駒を選択してください";
+                if (card === CARD_IDATEN) msg = "韋駄天にする味方の駒を選択してください";
+                
+                this.updateMessage(msg);
+                this.render();
+            }
         }
     }
 
-    resolveCardTarget(x, y) {
+    resolveCardTarget(x, y, isRemote = false) {
         const targetPiece = this.board[y][x];
         const card = this.targetingCard.card;
         const player = this.targetingCard.player;
@@ -1404,12 +1483,18 @@ class Game {
         }
 
         if (success) {
+            if (!isRemote) this.pendingAction = { type: 'card', cardType: card, player, cardIndex: this.targetingCard.index, target: {x, y} };
             this.cards[player].splice(this.targetingCard.index, 1);
             this.targetingCard = null;
             this.render();
-            window.showModal("カード発動", `${card}を発動しました！`, [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
+            
+            if (!isRemote) {
+                window.showModal("カード発動", `${card}を発動しました！`, [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
+            } else {
+                this.endTurn();
+            }
         } else {
-            this.updateMessage("対象が不正です。もう一度選ぶかカードを押してキャンセル");
+            if (!isRemote) this.updateMessage("対象が不正です。もう一度選ぶかカードを押してキャンセル");
         }
     }
 
@@ -1437,7 +1522,6 @@ class Game {
             this.board[from.y][from.x] = null;
             this.board[to.y][to.x] = movedPiece;
 
-            // 王の位置を追跡更新
             if (movedPiece.type === KING) {
                 this.kingPos[movedPiece.owner] = {x: to.x, y: to.y};
             }
@@ -1462,20 +1546,32 @@ class Game {
 
         if (forcePromote || autoPromote === true) {
             movedPiece.promoted = true;
+            this.pendingAction = { type: 'move', move: {from, to, promote: true} };
             this.endTurn();
         } else if (autoPromote === false) {
+            this.pendingAction = { type: 'move', move: {from, to, promote: false} };
             this.endTurn();
         } else if (isPromoteAttempt) {
-            this.showPromoteModal(movedPiece, to);
+            this.showPromoteModal(movedPiece, to, from);
         } else {
+            this.pendingAction = { type: 'move', move: {from, to, promote: false} };
             this.endTurn();
         }
     }
 
-    showPromoteModal(piece, to) {
+    showPromoteModal(piece, to, from) {
         window.showModal("成りますか？", "", [
-            { text: "成る", onClick: () => { piece.promoted = true; window.hideModal(); this.endTurn(); } },
-            { text: "成らない", onClick: () => { window.hideModal(); this.endTurn(); } }
+            { text: "成る", onClick: () => { 
+                piece.promoted = true; 
+                this.pendingAction = { type: 'move', move: {from, to, promote: true} };
+                window.hideModal(); 
+                this.endTurn(); 
+            } },
+            { text: "成らない", onClick: () => { 
+                this.pendingAction = { type: 'move', move: {from, to, promote: false} };
+                window.hideModal(); 
+                this.endTurn(); 
+            } }
         ]);
     }
 
@@ -1492,47 +1588,49 @@ class Game {
             }
         }
 
-        // --- UIの即時反映と非同期処理への分離（カクつきゼロ化） ---
         this.moveCount++;
         this.turn = this.turn === PLAYER ? OPPONENT : PLAYER;
         
-        this.render(); // コマ移動直後の状態を「即座に」描画
-        
-        if (this.isOnline) {
-            this.syncStateAsync();
-        }
-
-        setTimeout(() => this.postTurnProcessing(), 5);
+        // 通信の二重発生を防ぐため、ここでは描画や送信を行わず、直ぐに後処理へ移行する
+        this.postTurnProcessing();
     }
 
     postTurnProcessing() {
+        let isMate = false;
         if (!this.hasAnyLegalMove(this.turn, true)) {
             this.clock.stop();
             const winner = this.turn === PLAYER ? "後手" : "先手";
             let msg = `${winner}の勝ちです！(詰み)`;
             this.updateMessage(msg);
             this.isGameOver = true;
-            this.render();
+            isMate = true;
             window.showModal("決着", msg, [{text: "閉じる", onClick: window.hideModal}]);
-            this.syncStateAsync();
-            return;
         }
 
         let modalTriggered = false;
-        if (this.moveCount % 10 === 0) {
+        if (!isMate && this.moveCount % 10 === 0) {
             this.cards[PLAYER].push(CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)]);
             this.cards[OPPONENT].push(CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)]);
             modalTriggered = true;
         }
 
-        if (this.isInCheck(this.turn)) {
-            this.updateMessage("王手！");
-        } else if (!this.targetingCard) {
-            this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+        if (!isMate) {
+            if (this.isInCheck(this.turn)) {
+                this.updateMessage("王手！");
+            } else if (!this.targetingCard) {
+                this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+            }
+            this.clock.switchTurn(this.turn);
         }
 
-        this.clock.switchTurn(this.turn);
+        // 状態が完全に確定してから、1回だけ画面を描画
         this.render();
+
+        // ★ アクション（差分）があれば送信してクリア（これが軽量化の要）
+        if (this.isOnline && this.pendingAction) {
+            this.sendActionAsync(this.pendingAction);
+            this.pendingAction = null;
+        }
 
         if (modalTriggered && !this.cpuLevel) {
             window.showModal("カード支給", "📜 計10手経過！両者に特殊カード支給！", [{text: "確認", onClick: window.hideModal}]);
@@ -1540,21 +1638,19 @@ class Game {
 
         // CPUのターン
         if (this.cpuLevel && this.turn === OPPONENT && !this.isGameOver) {
-            setTimeout(() => this.cpuThink(), 300); // UI更新を挟むためのディレイ
+            setTimeout(() => this.cpuThink(), 50);
         }
     }
 
-    // --- CPU思考ルーチン ---
     async cpuThink() {
         this.updateMessage("CPUが思考中...");
-        await new Promise(r => setTimeout(r, 50)); // UI更新待ち
+        await new Promise(r => setTimeout(r, 50));
 
-        // カードをランダムに使用する (約20%の確率)
         if (this.cards[OPPONENT].length > 0 && Math.random() < 0.2) {
             const cardIdx = Math.floor(Math.random() * this.cards[OPPONENT].length);
             const card = this.cards[OPPONENT][cardIdx];
             if (this.executeCPUCard(card, cardIdx)) {
-                await new Promise(r => setTimeout(r, 800)); // 発動演出
+                await new Promise(r => setTimeout(r, 800));
             }
         }
 
@@ -1564,10 +1660,10 @@ class Game {
         let bestMove = null;
         let promote = false;
 
-        if (this.cpuLevel === 1) { // 初級 (ランダム)
+        if (this.cpuLevel === 1) {
             bestMove = moves[Math.floor(Math.random() * moves.length)];
             if (this.canPromote(bestMove, OPPONENT)) promote = Math.random() > 0.5;
-        } else { // 中級(depth=2), 上級(depth=3)
+        } else {
             const depth = this.cpuLevel === 2 ? 2 : 3;
             const res = await this.getBestMoveAlphaBetaAsync(depth, OPPONENT, moves);
             bestMove = res.move;
@@ -1635,7 +1731,6 @@ class Game {
         return false;
     }
 
-    // 評価関数
     evaluateBoard() {
         let score = 0;
         const pVals = { [PAWN]: 100, [LANCE]: 300, [KNIGHT]: 400, [SILVER]: 500, [GOLD]: 600, [BISHOP]: 800, [ROOK]: 1000, [KING]: 10000, [WALL]: 0 };
@@ -1646,7 +1741,6 @@ class Game {
                 const p = this.board[y][x];
                 if (p && p.type !== WALL) {
                     let val = p.promoted ? pPromVals[p.type] : pVals[p.type];
-                    // 陣地前進ボーナス（攻めの姿勢）
                     if (p.type !== KING) {
                         if (p.owner === OPPONENT) val += y * 2;
                         else val += (8 - y) * 2;
@@ -1660,23 +1754,22 @@ class Game {
         for (let type of this.hands[OPPONENT]) score += pVals[type] * 1.1;
         for (let type of this.hands[PLAYER]) score -= pVals[type] * 1.1;
 
-        return score; // CPU（OPPONENT）から見たスコア
+        return score;
     }
 
-    // AI用状態の操作（Do / Undo）
     doMoveTemp(move, player, promote) {
         const history = {
             hands: { [PLAYER]: [...this.hands[PLAYER]], [OPPONENT]: [...this.hands[OPPONENT]] }
         };
         
-        if (move.from.type) { // 持ち駒
+        if (move.from.type) {
             history.fromType = move.from.type;
             history.toPiece = this.board[move.to.y][move.to.x];
             
             const idx = this.hands[player].indexOf(move.from.type);
             if(idx > -1) this.hands[player].splice(idx, 1);
             this.board[move.to.y][move.to.x] = { type: move.from.type, owner: player, promoted: false };
-        } else { // 盤上の駒
+        } else {
             history.fromPiece = this.board[move.from.y][move.from.x];
             history.toPiece = this.board[move.to.y][move.to.x];
             
@@ -1711,7 +1804,6 @@ class Game {
         let alpha = -Infinity;
         let beta = Infinity;
 
-        // 手順のランダム性を少し入れる
         const moves = [...initialMoves].sort(() => Math.random() - 0.5);
 
         for (let m of moves) {
@@ -1730,7 +1822,6 @@ class Game {
                 }
                 alpha = Math.max(alpha, bestScore);
             }
-            // 処理をメインスレッドに譲りUIフリーズを回避
             await new Promise(r => setTimeout(r, 0));
         }
 
@@ -1749,7 +1840,7 @@ class Game {
             let maxScore = -Infinity;
             for (let m of moves) {
                 const canPro = this.canPromote(m, player);
-                const promotes = canPro ? [true] : [false]; // AIの探索空間削減のため必ず成るを優先
+                const promotes = canPro ? [true] : [false];
                 for (let pro of promotes) {
                     const history = this.doMoveTemp(m, player, pro);
                     const score = this.alphaBetaSearch(depth - 1, alpha, beta, PLAYER);
@@ -1780,14 +1871,12 @@ class Game {
         }
     }
 
-    // --- 描画（UIを劇的に軽くするための最適化済み） ---
     render() {
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 const cell = this.cells[y][x];
                 const piece = this.board[y][x];
                 
-                // 強制的な再描画（Reflow）を防ぐため、必要な場合のみクラスを更新
                 let cClasses = 'cell';
                 if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) cClasses += ' selected';
                 if (this.lastMove && ((this.lastMove.from.type === 'board' && this.lastMove.from.x === x && this.lastMove.from.y === y) || (this.lastMove.to.x === x && this.lastMove.to.y === y))) cClasses += ' last-move';
