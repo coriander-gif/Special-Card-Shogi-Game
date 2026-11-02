@@ -920,6 +920,16 @@ class Game {
         this.render();
     }
 
+    initKingPositions() {
+        this.kingPos = { [PLAYER]: null, [OPPONENT]: null };
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.type === KING) this.kingPos[p.owner] = {x, y};
+            }
+        }
+    }
+
     // ★ 差分データ（指し手・カード使用）のみを送信する超軽量メソッド
     sendActionAsync(action) {
         if (!this.isOnline || !this.roomId) return;
