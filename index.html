@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>特殊カード将棋 - 持ち駒将棋モード追加版</title>
+    <title>特殊カード将棋 - CPU対戦機能付き</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap');
@@ -152,18 +152,6 @@
             border-radius: 2px;
             box-shadow: inset 1px 1px 2px rgba(255,255,255,0.1), 1px 1px 3px rgba(0,0,0,0.4);
             letter-spacing: 2px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            min-width: 120px;
-        }
-
-        .score-display {
-            font-size: 16px;
-            background: rgba(0,0,0,0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: #ffd700;
         }
 
         .card-area {
@@ -246,16 +234,16 @@
             z-index: 10;
         }
 
-        #modal-overlay, #sd-overlay {
+        #modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.5);
             z-index: 50;
             justify-content: center;
             align-items: center;
         }
-        #modal-content, #sd-content {
+        #modal-content {
             background: #fdf4d6;
             padding: 20px;
             border-radius: 4px;
@@ -263,7 +251,6 @@
             text-align: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             min-width: 300px;
-            max-width: 500px;
         }
         
         .modal-input {
@@ -288,8 +275,6 @@
             gap: 10px;
             z-index: 40;
             justify-content: flex-end;
-            width: 100%;
-            padding-left: 10px;
         }
         .menu-btn {
             padding: 6px 12px;
@@ -300,12 +285,28 @@
             box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
             transition: all 0.2s;
         }
-        #menu-local { background-color: #6e462e; color: #ebd1ba; border: 1px solid #5d4037; }
-        #menu-cpu { background-color: #065f46; color: white; border: 1px solid #064e3b; }
-        #menu-online { background-color: #1e3a8a; color: white; border: 1px solid #1e40af; }
-        #menu-point35 { background-color: #9d0208; color: white; border: 1px solid #6a040f; }
-        #menu-point79 { background-color: #370617; color: white; border: 1px solid #03071e; }
+        #menu-local {
+            background-color: #6e462e;
+            color: #ebd1ba;
+            border: 1px solid #5d4037;
+        }
+        #menu-local:hover { background-color: #5d4037; }
         
+        #menu-cpu {
+            background-color: #065f46;
+            color: white;
+            border: 1px solid #064e3b;
+        }
+        #menu-cpu:hover { background-color: #064e3b; }
+
+        #menu-online {
+            background-color: #1e3a8a;
+            color: white;
+            border: 1px solid #1e40af;
+        }
+        #menu-online:hover { background-color: #1e40af; }
+        
+        /* オンライン時のステータス表示 */
         #online-status {
             display: none;
             width: 100%;
@@ -317,36 +318,6 @@
             font-size: 14px;
         }
 
-        /* サドンデス用リスト */
-        .sd-piece-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center;
-            margin: 10px 0;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .sd-piece {
-            width: 40px; height: 46px;
-            border: 2px solid transparent;
-            cursor: pointer;
-            position: relative;
-        }
-        .sd-piece.selected { border-color: red; background-color: rgba(255,0,0,0.2); }
-        
-        #btn-point-rule {
-            position: fixed;
-            top: 60px; right: 10px;
-            width: 36px; height: 36px;
-            background-color: #f59e0b; color: white;
-            border-radius: 50%;
-            font-size: 20px; font-weight: bold;
-            display: none; justify-content: center; align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.4); z-index: 45;
-            cursor: pointer;
-        }
-
     </style>
 </head>
 <body class="flex flex-col lg:flex-row justify-center items-center lg:items-start py-10 w-full px-2 gap-8 mx-auto max-w-5xl">
@@ -356,12 +327,7 @@
         <button id="menu-local" class="menu-btn">2人対戦</button>
         <button id="menu-cpu" class="menu-btn">CPU対戦</button>
         <button id="menu-online" class="menu-btn">オンライン対戦</button>
-        <button id="menu-point35" class="menu-btn">持ち駒将棋(35pt)</button>
-        <button id="menu-point79" class="menu-btn">持ち駒将棋(79pt)</button>
     </div>
-
-    <!-- ルール確認ボタン（持ち駒将棋モード時のみ表示） -->
-    <button id="btn-point-rule" onclick="window.showPointRule()" title="ルールの確認">?</button>
 
     <!-- オンラインステータス -->
     <div id="online-status" class="fixed top-0 left-0 z-40 shadow">
@@ -369,7 +335,7 @@
     </div>
 
     <!-- 時計・設定パネル -->
-    <div class="flex flex-col gap-4 w-full max-w-xs bg-[#e3ded6] p-4 rounded-lg shadow-lg border-2 border-[#5d4037] shrink-0 mt-12 lg:mt-0">
+    <div class="flex flex-col gap-4 w-full max-w-xs bg-[#e3ded6] p-4 rounded-lg shadow-lg border-2 border-[#5d4037] shrink-0 mt-8 lg:mt-0">
         <div id="opponent-clock-box" class="flex flex-col items-center p-3 border-4 border-transparent bg-white rounded shadow transition-colors rotate-180">
             <div class="text-sm font-bold text-gray-600 mb-1" id="opponent-name">後手</div>
             <div id="opponent-time" class="text-3xl font-mono tracking-wider font-bold text-gray-800">10:00</div>
@@ -400,18 +366,17 @@
     <div class="flex flex-col items-center w-full max-w-md shrink-0">
     <!-- 後手エリア -->
     <div class="w-full flex justify-between items-start mb-2">
+        <!-- 左上：後手の駒台 -->
         <div class="flex items-start gap-1">
-            <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]" id="opp-hand-container">
+            <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
                 <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-t border-[#5d4037]/50 pt-1 block rotate-180">後手の駒台</div>
                 <div id="opponent-hand" class="hand-area flex flex-wrap gap-1"></div>
             </div>
             <button onclick="window.showCardHelp(1)" class="mt-1 w-6 h-6 bg-[#6e462e] text-[#ebd1ba] rounded-full font-bold shadow-[1px_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#5d4037] hover:scale-110 transition flex-shrink-0 flex items-center justify-center text-sm rotate-180" title="カードの効果を見る">?</button>
         </div>
+        <!-- 右上：ラベルとカード -->
         <div class="flex flex-col items-end flex-1 pl-2">
-            <div id="opponent-label" class="player-label mb-2 rotate-180">
-                <span>後手</span>
-                <span id="opponent-score" class="score-display hidden">0pt</span>
-            </div>
+            <div id="opponent-label" class="player-label mb-2 rotate-180">後手</div>
             <div id="opponent-cards" class="card-area justify-end"></div>
         </div>
     </div>
@@ -421,16 +386,15 @@
 
     <!-- 先手エリア -->
     <div class="w-full flex justify-between items-end mt-4">
+        <!-- 左下：カード -->
         <div class="flex flex-col items-start flex-1 pr-2">
             <div id="player-cards" class="card-area justify-start"></div>
         </div>
+        <!-- 右下：ラベルと駒台 -->
         <div class="flex flex-col items-end">
-            <div id="player-label" class="player-label mb-2">
-                <span>先手</span>
-                <span id="player-score" class="score-display hidden">0pt</span>
-            </div>
+            <div class="player-label mb-2">先手</div>
             <div class="flex items-end gap-1">
-                <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]" id="ply-hand-container">
+                <div class="bg-[#d6aa69] border-2 border-[#5d4037] rounded shadow-[2px_4px_6px_rgba(0,0,0,0.3)] p-2 w-[140px] min-h-[70px]">
                     <div class="text-xs text-center text-[#5d4037] font-bold mb-1 border-b border-[#5d4037]/50 pb-1">先手の駒台</div>
                     <div id="player-hand" class="hand-area flex flex-wrap gap-1"></div>
                 </div>
@@ -452,18 +416,9 @@
             <div id="modal-input-container" class="w-full hidden">
                 <input type="text" id="modal-input" class="modal-input" maxlength="5" placeholder="5文字のコード">
             </div>
-            <div id="modal-buttons" class="flex gap-4 mt-2 w-full justify-center flex-wrap"></div>
-        </div>
-    </div>
-
-    <!-- サドンデス用UI -->
-    <div id="sd-overlay">
-        <div id="sd-content" class="flex flex-col items-center">
-            <h3 class="text-xl font-bold mb-2 text-red-600">サドンデス延長戦！</h3>
-            <p class="text-sm font-bold mb-2">これまでに獲得した駒から<br><span class="text-lg text-blue-600">12pt以下</span>になるように選んでください。</p>
-            <div class="text-lg font-bold mb-2">合計: <span id="sd-current-cost">0</span> / 12 pt</div>
-            <div id="sd-pieces" class="sd-piece-list"></div>
-            <button id="sd-confirm-btn" class="mt-4 px-6 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700 transition opacity-50 cursor-not-allowed" disabled>これで決定する</button>
+            <div id="modal-buttons" class="flex gap-4 mt-2 w-full justify-center flex-wrap">
+                <!-- ボタンが動的に追加されます -->
+            </div>
         </div>
     </div>
 
@@ -474,9 +429,10 @@ import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.g
 import { getDatabase, ref, set, get, update, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
 // --- 定数定義 ---
-const PLAYER = 0;
-const OPPONENT = 1;
+const PLAYER = 0; // 先手 (下側)
+const OPPONENT = 1; // 後手 (上側)
 
+// 駒の種類
 const EMPTY = 0;
 const PAWN = 1;
 const LANCE = 2;
@@ -488,842 +444,1646 @@ const ROOK = 7;
 const KING = 8;
 const WALL = 99;
 
+// 駒の移動方向
 const MOVE_DIRS = {
     KING: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}],
     PAWN: { 0: [{dx: 0, dy: -1}], 1: [{dx: 0, dy: 1}] },
     KNIGHT: { 0: [{dx: -1, dy: -2}, {dx: 1, dy: -2}], 1: [{dx: -1, dy: 2}, {dx: 1, dy: 2}] },
-    SILVER: { 0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:1}, {dx:1,dy:1}], 1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:-1}, {dx:1,dy:-1}] },
-    GOLD: { 0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:1}], 1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:-1}] },
+    SILVER: { 
+        0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:1}, {dx:1,dy:1}],
+        1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:-1}, {dx:1,dy:-1}]
+    },
+    GOLD: {
+        0: [{dx:-1,dy:-1}, {dx:0,dy:-1}, {dx:1,dy:-1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:1}],
+        1: [{dx:-1,dy:1}, {dx:0,dy:1}, {dx:1,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}, {dx:0,dy:-1}]
+    },
     LANCE: { 0: [{dx: 0, dy: -1, slide: true}], 1: [{dx: 0, dy: 1, slide: true}] },
     BISHOP: [{dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}],
     ROOK: [{dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true}],
-    PRO_BISHOP: [{dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}, {dx:0, dy:-1}, {dx:0, dy:1}, {dx:-1, dy:0}, {dx:1, dy:0}],
-    PRO_ROOK: [{dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true}, {dx:-1, dy:-1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:1, dy:1}],
-    IDATEN: [{dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true}, {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}]
+    PRO_BISHOP: [
+        {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true},
+        {dx:0, dy:-1}, {dx:0, dy:1}, {dx:-1, dy:0}, {dx:1, dy:0}
+    ],
+    PRO_ROOK: [
+        {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
+        {dx:-1, dy:-1}, {dx:1, dy:-1}, {dx:-1, dy:1}, {dx:1, dy:1}
+    ],
+    IDATEN: [
+        {dx:0, dy:-1, slide: true}, {dx:0, dy:1, slide: true}, {dx:-1, dy:0, slide: true}, {dx:1, dy:0, slide: true},
+        {dx:-1, dy:-1, slide: true}, {dx:1, dy:-1, slide: true}, {dx:-1, dy:1, slide: true}, {dx:1, dy:1, slide: true}
+    ]
 };
 
-const CARD_STEAL = '強奪', CARD_WALL = '壁設置', CARD_FREEZE = '氷結', CARD_SHIELD = '盾', CARD_IDATEN = '韋駄天';
+// カード効果
+const CARD_STEAL = '強奪';
+const CARD_WALL = '壁設置';
+const CARD_FREEZE = '氷結';
+const CARD_SHIELD = '盾';
+const CARD_IDATEN = '韋駄天';
 const CARD_TYPES = [CARD_STEAL, CARD_WALL, CARD_FREEZE, CARD_SHIELD, CARD_IDATEN];
 
 const pieceStrs = {
-    [PAWN]: ['歩', 'と'], [LANCE]: ['香', '杏'], [KNIGHT]: ['桂', '圭'], [SILVER]: ['銀', '全'],
-    [GOLD]: ['金', ''], [BISHOP]: ['角', '馬'], [ROOK]: ['飛', '龍'], [KING]: ['玉', '']
+    [PAWN]: ['歩', 'と'], [LANCE]: ['香', '杏'], [KNIGHT]: ['桂', '圭'],
+    [SILVER]: ['銀', '全'], [GOLD]: ['金', ''], [BISHOP]: ['角', '馬'],
+    [ROOK]: ['飛', '龍'], [KING]: ['玉', '']
 };
 
-const PIECE_POINTS = { [KING]: 15, [ROOK]: 10, [BISHOP]: 8, [GOLD]: 6, [SILVER]: 5, [KNIGHT]: 4, [LANCE]: 3, [PAWN]: 1 };
+// --- Firebase連携 ---
+let db = null;
+let auth = null;
+let currentUser = null;
+let isFirebaseReady = false;
+let analytics = null;
 
-let db = null, auth = null, currentUser = null, isFirebaseReady = false;
 const firebaseConfig = {
-  apiKey: "AIzaSyBcvkE1KUfkKiPYf3DdiyQh1D556068Nss", authDomain: "special-card-shogi-game.firebaseapp.com", databaseURL: "https://special-card-shogi-game-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "special-card-shogi-game"
+  apiKey: "AIzaSyBcvkE1KUfkKiPYf3DdiyQh1D556068Nss",
+  authDomain: "special-card-shogi-game.firebaseapp.com",
+  databaseURL: "https://special-card-shogi-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "special-card-shogi-game",
+  storageBucket: "special-card-shogi-game.firebasestorage.app",
+  messagingSenderId: "292188538308",
+  appId: "1:292188538308:web:5fb0f4d287b5a135869091",
+  measurementId: "G-Y29EEPE412"
 };
+
+const appId = firebaseConfig.projectId;
 
 async function initFirebase() {
     try {
-        const app = initializeApp(firebaseConfig); db = getDatabase(app); auth = getAuth(app);
-        const cred = await signInAnonymously(auth);
-        currentUser = cred.user; isFirebaseReady = true; return true;
-    } catch (e) { isFirebaseReady = false; return false; }
+        const app = initializeApp(firebaseConfig);
+        try {
+            analytics = getAnalytics(app);
+        } catch(e) { }
+        db = getDatabase(app);
+        auth = getAuth(app);
+        
+        let cred;
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            cred = await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            cred = await signInAnonymously(auth);
+        }
+        currentUser = cred.user;
+        isFirebaseReady = !!currentUser;
+        return true;
+    } catch (e) {
+        console.warn("Firebase offline mode fallback.");
+        isFirebaseReady = false;
+        return false;
+    }
 }
 
+// --- 対局時計 ---
 class Clock {
-    constructor(onTimeUp) { this.onTimeUp = onTimeUp; this.readSettings(); }
-    readSettings() {
-        this.initialSec = (parseInt(document.getElementById('setting-time').value) || 0) * 60;
-        this.byoyomiSec = parseInt(document.getElementById('setting-byoyomi').value) || 0;
+    constructor(onTimeUp) {
+        this.onTimeUp = onTimeUp;
+        this.timer = null;
+        this.readSettings();
     }
+
+    readSettings() {
+        const timeInput = parseInt(document.getElementById('setting-time').value) || 0;
+        const byoyomiInput = parseInt(document.getElementById('setting-byoyomi').value) || 0;
+        this.initialSec = timeInput * 60;
+        this.byoyomiSec = byoyomiInput;
+    }
+
     reset() {
         this.readSettings();
         this.time = { [PLAYER]: this.initialSec, [OPPONENT]: this.initialSec };
         this.inByoyomi = { [PLAYER]: this.initialSec <= 0, [OPPONENT]: this.initialSec <= 0 };
         this.currentByoyomi = { [PLAYER]: this.byoyomiSec, [OPPONENT]: this.byoyomiSec };
-        this.active = false; this.turn = PLAYER;
+        this.active = false;
+        this.turn = PLAYER;
         if(this.timer) clearInterval(this.timer);
         this.render();
     }
-    start() { if(!this.active){ this.active = true; this.timer = setInterval(() => this.tick(), 1000); this.render(); } }
-    stop() { this.active = false; if(this.timer) clearInterval(this.timer); }
-    switchTurn(newTurn) { if(!this.active) return; this.currentByoyomi[this.turn] = this.byoyomiSec; this.turn = newTurn; this.render(); }
+
+    start() {
+        if (this.active) return;
+        this.active = true;
+        this.timer = setInterval(() => this.tick(), 1000);
+        this.render();
+    }
+
+    stop() {
+        this.active = false;
+        if(this.timer) clearInterval(this.timer);
+    }
+
+    switchTurn(newTurn) {
+        if (!this.active) return;
+        this.currentByoyomi[this.turn] = this.byoyomiSec;
+        this.turn = newTurn;
+        this.render();
+    }
+
     tick() {
         if (!this.active) return;
+        
         let p = this.turn;
         if (!this.inByoyomi[p]) {
-            this.time[p]--; if(this.time[p]<=0) { this.time[p]=0; this.inByoyomi[p]=true; }
+            this.time[p]--;
+            if (this.time[p] <= 0) {
+                this.time[p] = 0;
+                this.inByoyomi[p] = true;
+            }
         } else {
-            this.currentByoyomi[p]--; if(this.currentByoyomi[p]<0){ this.stop(); this.onTimeUp(p); return; }
+            this.currentByoyomi[p]--;
+            if (this.currentByoyomi[p] < 0) {
+                this.stop();
+                this.onTimeUp(p);
+                return;
+            }
         }
         this.render();
     }
-    formatTime(sec) { const m=Math.floor(sec/60), s=sec%60; return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
+
+    formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
     render() {
-        const upd = (p, timeId, byoId, boxId) => {
-            const timeEl=document.getElementById(timeId), byoEl=document.getElementById(byoId), boxEl=document.getElementById(boxId);
-            if(timeEl) timeEl.innerText = this.formatTime(this.time[p]);
-            if(byoEl) {
-                if(this.inByoyomi[p]) { byoEl.innerText=`秒読み: ${this.currentByoyomi[p]}秒`; byoEl.style.color=(this.active&&this.turn===p&&this.currentByoyomi[p]<=10)?'#d13030':'#4a3623'; }
-                else byoEl.innerText='';
+        const updatePlayerUI = (player, timeElId, byoElId, boxId) => {
+            const timeEl = document.getElementById(timeElId);
+            const byoEl = document.getElementById(byoElId);
+            const boxEl = document.getElementById(boxId);
+            
+            if (timeEl) timeEl.innerText = this.formatTime(this.time[player]);
+            if (byoEl) {
+                if (this.inByoyomi[player]) {
+                    byoEl.innerText = `秒読み: ${this.currentByoyomi[player]}秒`;
+                    byoEl.style.color = (this.active && this.turn === player && this.currentByoyomi[player] <= 10) ? '#d13030' : '#4a3623';
+                } else {
+                    byoEl.innerText = '';
+                }
             }
-            if(boxEl) {
-                if(this.active && this.turn===p) { boxEl.classList.add('border-[#f57f17]','bg-[#fff9c4]'); boxEl.classList.remove('border-transparent','bg-white'); }
-                else { boxEl.classList.remove('border-[#f57f17]','bg-[#fff9c4]'); boxEl.classList.add('border-transparent','bg-white'); }
+            if (boxEl) {
+                if (this.active && this.turn === player) {
+                    boxEl.classList.add('border-[#f57f17]', 'bg-[#fff9c4]');
+                    boxEl.classList.remove('border-transparent', 'bg-white');
+                } else {
+                    boxEl.classList.remove('border-[#f57f17]', 'bg-[#fff9c4]');
+                    boxEl.classList.add('border-transparent', 'bg-white');
+                }
             }
         };
-        upd(PLAYER, 'player-time', 'player-byoyomi', 'player-clock-box'); upd(OPPONENT, 'opponent-time', 'opponent-byoyomi', 'opponent-clock-box');
+
+        updatePlayerUI(PLAYER, 'player-time', 'player-byoyomi', 'player-clock-box');
+        updatePlayerUI(OPPONENT, 'opponent-time', 'opponent-byoyomi', 'opponent-clock-box');
     }
 }
 
+// --- ゲームロジック ---
 class Game {
     constructor() {
-        this.clock = new Clock((p) => this.handleTimeUp(p));
-        this.isOnline = false; this.roomId = null; this.myRole = null; this.bc = null; this.cpuLevel = null;
-        this.gameMode = 'normal'; this.targetPoints = 0;
-        this.initBoardDOM(); this.initBoard();
+        this.clock = new Clock((player) => this.handleTimeUp(player));
+        this.isOnline = false;
+        this.roomId = null;
+        this.myRole = null;
+        this.unsubscribe = null;
+        this.bc = null;
+        this.pendingAction = null; // ★ 送信予定のアクションを保持する変数
+        
+        // CPUモード関連
+        this.cpuLevel = null; // null(OFF), 1(初級), 2(中級), 3(上級)
+        
+        this.initBoardDOM();
+        this.initBoard();
     }
+
     initBoardDOM() {
-        const b = document.getElementById('board'); b.innerHTML = ''; this.cells = [];
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = '';
+        this.cells = [];
         for (let y = 0; y < 9; y++) {
             this.cells[y] = [];
             for (let x = 0; x < 9; x++) {
-                const c = document.createElement('div'); c.className = 'cell'; c.onclick = () => this.handleClick('board', x, y);
-                this.cells[y][x] = c; b.appendChild(c);
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => this.handleClick('board', x, y);
+                this.cells[y][x] = cell;
+                boardEl.appendChild(cell);
             }
         }
     }
-    updateMessage(msg) { const el = document.getElementById('message'); if(el) el.innerText = msg; }
-    
-    handleTimeUp(player, isRemote = false) {
-        this.isGameOver = true; this.clock.stop();
-        const winner = player === PLAYER ? "後手" : "先手";
-        let msg = `時間切れにより、${winner}の勝ちです！`;
-        this.updateMessage(msg); this.render();
-        window.showModal(msg, "", [{text: "閉じる", onClick: window.hideModal}]);
-        if (!isRemote) this.sendActionAsync({ type: 'timeout', player });
+
+    updateMessage(msg) {
+        const msgEl = document.getElementById('message');
+        if (msgEl && msgEl.innerText !== msg) {
+            msgEl.innerText = msg;
+        }
     }
 
-    startPointGame(pts, isCpu=false, level=1) {
-        this.exitOnline();
-        this.gameMode = 'point'; this.targetPoints = pts; this.cpuLevel = isCpu ? level : null;
-        this.myRole = isCpu ? PLAYER : null;
-        this.initBoard(false);
-        const modeName = isCpu ? `CPU（${level===1?'初級':level===2?'中級':'上級'}）` : "2人対戦";
-        window.showModal("持ち駒将棋 開始", `${modeName} / 目標: ${pts}pt<br>王将(15pt)は取られても即負けではありません。<br>持ち駒を打つことはできません。`, [{text: "OK", onClick: window.hideModal}]);
+    handleTimeUp(player, isRemote = false) {
+        this.isGameOver = true;
+        this.clock.stop();
+        const loser = player === PLAYER ? "先手" : "後手";
+        const winner = player === PLAYER ? "後手" : "先手";
+        let msg = `時間切れにより、${winner}の勝ちです！`;
+        this.updateMessage(msg);
+        this.render();
+        window.showModal(msg, "", [{text: "閉じる", onClick: window.hideModal}]);
+        
+        // 自分がタイムアウトした時だけアクションとして送信
+        if (!isRemote) {
+            this.sendActionAsync({ type: 'timeout', player });
+        }
     }
 
     initBoard(sync = true) {
         this.board = Array.from({length: 9}, () => Array(9).fill(null));
         this.hands = { [PLAYER]: [], [OPPONENT]: [] };
-        this.points = { [PLAYER]: 0, [OPPONENT]: 0 };
-        this.captured = { [PLAYER]: [], [OPPONENT]: [] }; // サドンデス用履歴
-        this.sdPhase = 0; // 0:なし, 1:選択, 2:配置中, 3:再開(3pt先取)
-        this.sdReady = { [PLAYER]: false, [OPPONENT]: false };
-        
-        this.turn = PLAYER; this.selected = null; this.legalMoves = []; this.lastMove = null;
-        this.isGameOver = false; this.hasStarted = false; this.moveCount = 0;
-        this.cards = { [PLAYER]: [], [OPPONENT]: [] }; this.targetingCard = null; this.pendingAction = null;
+        this.turn = PLAYER;
+        this.selected = null;
+        this.legalMoves = [];
+        this.lastMove = null;
+        this.isGameOver = false;
+        this.hasStarted = false;
+        this.moveCount = 0;
+        this.cards = { [PLAYER]: [], [OPPONENT]: [] };
+        this.targetingCard = null;
+        this.pendingAction = null;
         this.clock.reset();
 
-        const initL = [
-            [{t:LANCE,o:1},{t:KNIGHT,o:1},{t:SILVER,o:1},{t:GOLD,o:1},{t:KING,o:1},{t:GOLD,o:1},{t:SILVER,o:1},{t:KNIGHT,o:1},{t:LANCE,o:1}],
-            [null,{t:ROOK,o:1},null,null,null,null,null,{t:BISHOP,o:1},null],
-            [{t:PAWN,o:1},{t:PAWN,o:1},{t:PAWN,o:1},{t:PAWN,o:1},{t:PAWN,o:1},{t:PAWN,o:1},{t:PAWN,o:1},{t:PAWN,o:1},{t:PAWN,o:1}],
-            [null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],
-            [{t:PAWN,o:0},{t:PAWN,o:0},{t:PAWN,o:0},{t:PAWN,o:0},{t:PAWN,o:0},{t:PAWN,o:0},{t:PAWN,o:0},{t:PAWN,o:0},{t:PAWN,o:0}],
-            [null,{t:BISHOP,o:0},null,null,null,null,null,{t:ROOK,o:0},null],
-            [{t:LANCE,o:0},{t:KNIGHT,o:0},{t:SILVER,o:0},{t:GOLD,o:0},{t:KING,o:0},{t:GOLD,o:0},{t:SILVER,o:0},{t:KNIGHT,o:0},{t:LANCE,o:0}]
+        const initialLayout = [
+            [{t:LANCE, o:1}, {t:KNIGHT, o:1}, {t:SILVER, o:1}, {t:GOLD, o:1}, {t:KING, o:1}, {t:GOLD, o:1}, {t:SILVER, o:1}, {t:KNIGHT, o:1}, {t:LANCE, o:1}],
+            [null, {t:ROOK, o:1}, null, null, null, null, null, {t:BISHOP, o:1}, null],
+            [{t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}, {t:PAWN, o:1}],
+            [null, null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null, null],
+            [{t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}, {t:PAWN, o:0}],
+            [null, {t:BISHOP, o:0}, null, null, null, null, null, {t:ROOK, o:0}, null],
+            [{t:LANCE, o:0}, {t:KNIGHT, o:0}, {t:SILVER, o:0}, {t:GOLD, o:0}, {t:KING, o:0}, {t:GOLD, o:0}, {t:SILVER, o:0}, {t:KNIGHT, o:0}, {t:LANCE, o:0}]
         ];
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) if(initL[y][x]) this.board[y][x]={type:initL[y][x].t,owner:initL[y][x].o,promoted:false};
+
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                if (initialLayout[y][x]) {
+                    this.board[y][x] = {
+                        type: initialLayout[y][x].t,
+                        owner: initialLayout[y][x].o,
+                        promoted: false
+                    };
+                }
+            }
+        }
+        
         this.initKingPositions();
         
-        const oppLabel = document.getElementById('opponent-name');
-        oppLabel.innerText = this.cpuLevel ? `CPU (${this.cpuLevel===1?"初級":this.cpuLevel===2?"中級":"上級"})` : "後手";
+        // ラベル更新
+        const oppLabel = document.getElementById('opponent-label');
+        const oppName = document.getElementById('opponent-name');
+        if (this.cpuLevel) {
+            const levelNames = {1: "初級", 2: "中級", 3: "上級"};
+            oppLabel.innerText = `CPU (${levelNames[this.cpuLevel]})`;
+            oppName.innerText = `CPU (${levelNames[this.cpuLevel]})`;
+        } else {
+            oppLabel.innerText = "後手";
+            oppName.innerText = "後手";
+        }
 
-        // UI切り替え
-        const isPt = (this.gameMode === 'point');
-        document.getElementById('player-score').classList.toggle('hidden', !isPt);
-        document.getElementById('opponent-score').classList.toggle('hidden', !isPt);
-        document.getElementById('btn-point-rule').style.display = isPt ? 'flex' : 'none';
+        this.updateMessage("先手の番です");
+        this.render();
         
-        // 持ち駒将棋モードでは駒台のタイトルを「獲得駒(サドンデス用)」に変更（見た目上）するか、打てないことを明示
-        document.getElementById('ply-hand-container').style.opacity = isPt ? '0.5' : '1';
-        document.getElementById('opp-hand-container').style.opacity = isPt ? '0.5' : '1';
-
-        this.updateMessage("先手の番です"); this.render();
-        if (sync && this.isOnline) this.syncStateAsync();
+        if (sync && this.isOnline) {
+            this.syncStateAsync();
+        }
     }
 
-    startCPUGame(level) { this.exitOnline(); this.gameMode='normal'; this.cpuLevel=level; this.myRole=PLAYER; this.initBoard(false); window.showModal("対局開始", `CPU（${level===1?'初級':level===2?'中級':'上級'}）との対局を開始します。`, [{text: "OK", onClick: window.hideModal}]); }
-    
-    // -- オンライン通信略式 --
+    startCPUGame(level) {
+        this.exitOnline();
+        this.cpuLevel = level;
+        this.myRole = PLAYER;
+        this.initBoard(false);
+        window.showModal("対局開始", `CPU（${level === 1 ? '初級' : level === 2 ? '中級' : '上級'}）との対局を開始します。<br>あなたは先手です。`, [{text: "OK", onClick: window.hideModal}]);
+    }
+
+    // -- オンライン関連 --
     async createRoom() {
-        this.roomId = Math.random().toString(36).substring(2, 7).toUpperCase(); this.isOnline = true; this.cpuLevel = null;
-        if (!isFirebaseReady) {
-            this.bc = new BroadcastChannel('shogi_room_'+this.roomId); this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
-            this.showWaitRoom(); return;
+        this.roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+        this.isOnline = true;
+        this.cpuLevel = null;
+        
+        if (!isFirebaseReady || !currentUser) {
+            this.bc = new BroadcastChannel('shogi_room_' + this.roomId);
+            this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
+            document.getElementById('online-status').style.display = 'block';
+            document.getElementById('room-code-display').innerText = this.roomId;
+            document.getElementById('my-role-display').innerText = '待機中...';
+            window.showModal("部屋を作成しました", `他のプレイヤーにこのコードを教えてください: <br><strong class="text-2xl">${this.roomId}</strong><br>対戦相手を待っています...<br><span class="text-sm text-red-600">(※ローカルモード: 同じブラウザの別タブでのみ有効です)</span>`, [
+                {text: "キャンセル", onClick: () => { window.hideModal(); this.exitOnline(); }}
+            ]);
+            return;
         }
+
+        const uid = currentUser.uid;
+        const roomRef = ref(db, 'rooms/' + this.roomId);
         try {
-            await set(ref(db, 'rooms/'+this.roomId), { status: 'waiting', host: currentUser.uid, roles: {}, createdAt: new Date().getTime() });
-            onDisconnect(ref(db, 'rooms/'+this.roomId)).remove();
-            this.listenToRoom(); this.showWaitRoom();
-        } catch(e) { window.showModal("エラー", "部屋作成失敗", [{text:"閉じる", onClick:window.hideModal}]); this.exitOnline(); }
+            await set(roomRef, { status: 'waiting', host: uid, guest: null, roles: {}, gameState: null, lastUpdateUserId: uid, createdAt: new Date().getTime() });
+            onDisconnect(roomRef).remove(); // 接続が切れたら自動で部屋を解散
+            
+            this.listenToRoom();
+            document.getElementById('online-status').style.display = 'block';
+            document.getElementById('room-code-display').innerText = this.roomId;
+            document.getElementById('my-role-display').innerText = '待機中...';
+            window.showModal("部屋を作成しました", `他のプレイヤーにこのコードを教えてください: <br><strong class="text-2xl">${this.roomId}</strong><br>対戦相手を待っています...`, [
+                {text: "キャンセル", onClick: () => { window.hideModal(); this.exitOnline(); }}
+            ]);
+        } catch(e) {
+            window.showModal("通信エラー", "部屋の作成に失敗しました。", [{text: "閉じる", onClick: window.hideModal}]);
+            this.exitOnline();
+        }
     }
-    showWaitRoom() {
-        document.getElementById('online-status').style.display = 'block'; document.getElementById('room-code-display').innerText = this.roomId;
-        document.getElementById('my-role-display').innerText = '待機中...';
-        window.showModal("部屋を作成しました", `コード: <strong class="text-2xl">${this.roomId}</strong><br>待機中...`, [{text: "キャンセル", onClick: () => { window.hideModal(); this.exitOnline(); }}]);
-    }
+
     async joinRoom(code) {
-        if (!isFirebaseReady) {
-            this.roomId = code; this.isOnline = true; this.cpuLevel = null; this.myRole = OPPONENT;
-            this.bc = new BroadcastChannel('shogi_room_'+this.roomId); this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
-            document.getElementById('online-status').style.display = 'block'; document.getElementById('room-code-display').innerText = this.roomId; document.getElementById('my-role-display').innerText = '後手';
-            window.hideModal(); this.bc.postMessage({ type: 'join' }); return;
+        if (!isFirebaseReady || !currentUser) {
+            this.roomId = code;
+            this.isOnline = true;
+            this.cpuLevel = null;
+            this.myRole = OPPONENT;
+            this.bc = new BroadcastChannel('shogi_room_' + this.roomId);
+            this.bc.onmessage = (e) => this.handleLocalMessage(e.data);
+            document.getElementById('online-status').style.display = 'block';
+            document.getElementById('room-code-display').innerText = this.roomId;
+            document.getElementById('my-role-display').innerText = '後手';
+            window.hideModal();
+            window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「後手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
+            this.bc.postMessage({ type: 'join' });
+            return;
         }
+
+        const roomRef = ref(db, 'rooms/' + code);
         try {
-            const snap = await get(ref(db, 'rooms/'+code));
-            if(snap.exists() && snap.val().status === 'waiting') {
-                this.roomId = code; this.isOnline = true; this.cpuLevel = null;
-                const hRole = Math.random()<0.5?PLAYER:OPPONENT, gRole = hRole===PLAYER?OPPONENT:PLAYER;
-                await update(ref(db, 'rooms/'+code), { status: 'playing', guest: currentUser.uid, roles: { [snap.val().host]: hRole, [currentUser.uid]: gRole } });
-                this.listenToRoom(); document.getElementById('online-status').style.display = 'block'; document.getElementById('room-code-display').innerText = this.roomId; window.hideModal();
-            } else window.showModal("エラー", "部屋なし", [{text:"閉じる", onClick:window.hideModal}]);
-        } catch(e) { window.showModal("エラー", "参加失敗", [{text:"閉じる", onClick:window.hideModal}]); }
+            const docSnap = await get(roomRef);
+            if (docSnap.exists() && docSnap.val().status === 'waiting') {
+                this.roomId = code;
+                this.isOnline = true;
+                this.cpuLevel = null;
+                const hostRole = Math.random() < 0.5 ? PLAYER : OPPONENT;
+                const guestRole = hostRole === PLAYER ? OPPONENT : PLAYER;
+                const uid = currentUser.uid;
+                await update(roomRef, { status: 'playing', guest: uid, roles: { [docSnap.val().host]: hostRole, [uid]: guestRole } });
+                this.listenToRoom();
+                document.getElementById('online-status').style.display = 'block';
+                document.getElementById('room-code-display').innerText = this.roomId;
+                window.hideModal();
+            } else {
+                window.showModal("エラー", "部屋が見つからないか、既に対戦中です。", [{text: "閉じる", onClick: window.hideModal}]);
+            }
+        } catch(e) {
+            window.showModal("通信エラー", "部屋への参加に失敗しました。", [{text: "閉じる", onClick: window.hideModal}]);
+        }
     }
+
     listenToRoom() {
-        if(this.unsubscribe) this.unsubscribe(); if(!isFirebaseReady) return;
-        this.unsubscribe = onValue(ref(db, 'rooms/'+this.roomId), (snap) => {
-            if(!snap.exists()) { this.exitOnline(); window.showModal("切断", "解散されました", [{text:"OK", onClick:window.hideModal}]); return; }
-            const data = snap.val(), uid = currentUser.uid;
-            if(data.status==='playing' && this.myRole===null) {
-                this.myRole = data.roles[uid]!==undefined ? data.roles[uid] : OPPONENT; document.getElementById('my-role-display').innerText = (this.myRole===PLAYER?'先手':'後手');
-                window.hideModal(); window.showModal("完了", `あなたは${this.myRole===PLAYER?'先手':'後手'}です`, [{text:"開始", onClick:window.hideModal}]);
-                if(data.host===uid) this.initBoard(true);
+        if (this.unsubscribe) this.unsubscribe();
+        if (!isFirebaseReady || !currentUser) return;
+        const roomRef = ref(db, 'rooms/' + this.roomId);
+        const uid = currentUser.uid;
+        
+        this.unsubscribe = onValue(roomRef, (snapshot) => {
+            if (!snapshot.exists()) {
+                this.exitOnline();
+                window.showModal("切断", "部屋が解散されました。", [{text: "OK", onClick: window.hideModal}]);
+                return;
             }
-            if(data.lastAction && data.lastUpdateUserId!==uid) {
-                if(data.lastAction.moveCount > this.moveCount) this.playAction(data.lastAction);
-                // サドンデスの配置同期用
-                if(data.lastAction.type==='sd_place') this.playAction(data.lastAction);
+            const data = snapshot.val();
+            if (data.status === 'playing' && this.myRole === null) {
+                this.myRole = data.roles[uid] !== undefined ? data.roles[uid] : OPPONENT;
+                document.getElementById('my-role-display').innerText = (this.myRole === PLAYER ? '先手' : '後手');
+                window.hideModal();
+                window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「${this.myRole === PLAYER ? '先手' : '後手'}」です。`, [{text: "対局開始", onClick: window.hideModal}]);
+                if (data.host === uid) this.initBoard(true);
             }
-            else if(data.gameState && data.lastUpdateUserId!==uid && this.moveCount===0) {
-                try { this.loadState(this.decompressState(typeof data.gameState==='string'?JSON.parse(data.gameState):data.gameState)); } catch(e){}
+            
+            // ★ フル同期ではなく、アクション（指し手）の差分を受信して実行
+            if (data.lastAction && data.lastUpdateUserId !== uid) {
+                if (data.lastAction.moveCount > this.moveCount) {
+                    this.playAction(data.lastAction);
+                }
+            } 
+            // 参加直後の初期盤面の同期時のみフルデータを使用
+            else if (data.gameState && data.lastUpdateUserId !== uid && this.moveCount === 0) {
+                try {
+                    const parsedState = typeof data.gameState === 'string' ? JSON.parse(data.gameState) : data.gameState;
+                    const decompressed = this.decompressState(parsedState);
+                    this.loadState(decompressed);
+                } catch(e) { console.error(e); }
             }
         });
     }
+
     handleLocalMessage(data) {
-        if(data.type==='join' && this.myRole===null) { this.myRole=PLAYER; document.getElementById('my-role-display').innerText='先手'; window.hideModal(); this.initBoard(true); }
-        else if(data.type==='action') { if(data.action.type==='sd_place' || data.action.moveCount>this.moveCount) this.playAction(data.action); }
-        else if(data.type==='sync' && this.moveCount===0) this.loadState(this.decompressState(data.state));
+        if (data.type === 'join' && this.myRole === null) {
+            this.myRole = PLAYER;
+            document.getElementById('my-role-display').innerText = '先手';
+            window.hideModal();
+            window.showModal("マッチング完了", `対戦相手が見つかりました。<br>あなたは「先手」です。`, [{text: "対局開始", onClick: window.hideModal}]);
+            this.initBoard(true);
+        } else if (data.type === 'action' && data.action && data.action.moveCount > this.moveCount) {
+            // ローカルでも差分のアクションを実行
+            this.playAction(data.action);
+        } else if (data.type === 'sync' && data.state && this.moveCount === 0) {
+            const decompressed = this.decompressState(data.state);
+            this.loadState(decompressed);
+        }
     }
-    
-    loadState(s) {
-        this.board=s.board; this.hands=s.hands; this.turn=s.turn; this.cards=s.cards;
-        this.clock.time=s.clockTime; this.clock.inByoyomi=s.clockByoyomi; this.clock.currentByoyomi=s.clockCurrentByoyomi;
-        this.lastMove=s.lastMove; this.moveCount=s.moveCount; this.isGameOver=s.isGameOver; this.hasStarted=s.hasStarted;
-        this.gameMode=s.gameMode||'normal'; this.points=s.points||{0:0,1:0}; this.targetPoints=s.targetPoints||0;
-        this.sdPhase=s.sdPhase||0;
-        if(this.hasStarted && !this.isGameOver) this.clock.start(); else if(this.isGameOver) this.clock.stop();
+
+    loadState(state) {
+        this.board = state.board;
+        this.hands = state.hands;
+        this.turn = state.turn;
+        this.cards = state.cards;
+        this.clock.time = state.clockTime;
+        this.clock.inByoyomi = state.clockByoyomi;
+        this.clock.currentByoyomi = state.clockCurrentByoyomi;
+        this.lastMove = state.lastMove;
+        this.moveCount = state.moveCount;
+        this.isGameOver = state.isGameOver;
+        this.hasStarted = state.hasStarted;
+        
+        if (this.hasStarted && !this.isGameOver) this.clock.start();
+        else if (this.isGameOver) this.clock.stop();
         this.clock.switchTurn(this.turn);
-        document.getElementById('player-score').classList.toggle('hidden', this.gameMode!=='point');
-        document.getElementById('opponent-score').classList.toggle('hidden', this.gameMode!=='point');
-        document.getElementById('btn-point-rule').style.display = this.gameMode==='point' ? 'flex' : 'none';
-        this.updateMessage(this.turn===PLAYER?"先手":"後手"); this.selected=null; this.legalMoves=[]; this.initKingPositions(); this.render();
+        
+        this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+        this.selected = null;
+        this.legalMoves = [];
+        this.targetingCard = null;
+        
+        this.initKingPositions();
+
+        this.render();
     }
+
     initKingPositions() {
         this.kingPos = { [PLAYER]: null, [OPPONENT]: null };
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) { const p=this.board[y][x]; if(p&&p.type===KING) this.kingPos[p.owner]={x,y}; }
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.type === KING) this.kingPos[p.owner] = {x, y};
+            }
+        }
     }
+
+    // ★ 差分データ（指し手・カード使用）のみを送信する超軽量メソッド
     sendActionAsync(action) {
-        if(!this.isOnline || !this.roomId) return;
-        const a = {...action, moveCount:this.moveCount, clock:{time:this.clock.time, inByoyomi:this.clock.inByoyomi, currentByoyomi:this.clock.currentByoyomi}};
-        if(!isFirebaseReady){ if(this.bc) this.bc.postMessage({type:'action', action:a}); return; }
-        try { update(ref(db, 'rooms/'+this.roomId), {lastAction:a, lastUpdateUserId:currentUser.uid}); } catch(e){}
-    }
-    playAction(a) {
-        if(this.isGameOver) return;
-        this.clock.time=a.clock.time; this.clock.inByoyomi=a.clock.inByoyomi; this.clock.currentByoyomi=a.clock.currentByoyomi;
-        if(a.type==='timeout') this.handleTimeUp(a.player, true);
-        else if(a.type==='move') this.executeMove(a.move.from, a.move.to, a.move.promote);
-        else if(a.type==='card') {
-            if(a.cardType===CARD_STEAL) this.useCard(a.player, a.cardIndex, true, a.rIdx);
-            else { this.targetingCard={card:a.cardType, player:a.player, index:a.cardIndex}; this.resolveCardTarget(a.target.x, a.target.y, true); }
+        if (!this.isOnline || !this.roomId) return;
+        
+        const actionData = {
+            ...action,
+            moveCount: this.moveCount,
+            clock: {
+                time: this.clock.time,
+                inByoyomi: this.clock.inByoyomi,
+                currentByoyomi: this.clock.currentByoyomi
+            }
+        };
+
+        if (!isFirebaseReady || !currentUser) {
+            if (this.bc) this.bc.postMessage({ type: 'action', action: actionData });
+            return;
         }
-        else if(a.type==='sd_place') {
-            this.sdReady[a.player] = true;
-            this.board = a.board; // 相手の配置済み盤面をもらう
-            this.checkSuddenDeathReady();
+
+        const roomRef = ref(db, 'rooms/' + this.roomId);
+        try { 
+            update(roomRef, { lastAction: actionData, lastUpdateUserId: currentUser.uid }); 
+        } catch(e) {}
+    }
+
+    // ★ 受信した相手の指し手やカード使用を自分の画面で自動再生する
+    playAction(actionData) {
+        if (this.isGameOver) return;
+        
+        // 時計のズレを同期
+        this.clock.time = actionData.clock.time;
+        this.clock.inByoyomi = actionData.clock.inByoyomi;
+        this.clock.currentByoyomi = actionData.clock.currentByoyomi;
+
+        if (actionData.type === 'timeout') {
+            this.handleTimeUp(actionData.player, true);
+        } else if (actionData.type === 'move') {
+            const { from, to, promote } = actionData.move;
+            // autoPromote を渡すことで、受信側では「成りますか？」のモーダルを出さずに自動で進める
+            this.executeMove(from, to, promote);
+        } else if (actionData.type === 'card') {
+            const { cardType, player, cardIndex, target, rIdx } = actionData;
+            if (cardType === CARD_STEAL) {
+                this.useCard(player, cardIndex, true, rIdx);
+            } else {
+                this.targetingCard = { card: cardType, player, index: cardIndex };
+                this.resolveCardTarget(target.x, target.y, true);
+            }
         }
     }
-    syncStateAsync() { if(!this.isOnline||!this.roomId) return; setTimeout(()=>this.syncState(),0); }
-    compressState(s) {
+
+    syncStateAsync() {
+        if (!this.isOnline || !this.roomId) return;
+        setTimeout(() => this.syncState(), 0); 
+    }
+
+    compressState(state) {
         return {
-            b:s.board.map(r=>r.map(p=>p?`${p.type},${p.owner},${p.promoted?1:0},${p.frozen||0},${p.shielded||0},${p.idaten||0},${p.duration||0}`:0)),
-            h:s.hands, t:s.turn, c:s.cards, ct:s.clockTime, cb:s.clockByoyomi, ccb:s.clockCurrentByoyomi, lm:s.lastMove, mc:s.moveCount, igo:s.isGameOver, hs:s.hasStarted,
-            gm:s.gameMode, pts:s.points, tp:s.targetPoints, sdp:s.sdPhase
+            b: state.board.map(row => row.map(p => p ? `${p.type},${p.owner},${p.promoted?1:0},${p.frozen?p.frozen:0},${p.shielded?p.shielded:0},${p.idaten?p.idaten:0},${p.duration||0}` : 0)),
+            h: state.hands,
+            t: state.turn,
+            c: state.cards,
+            ct: state.clockTime,
+            cb: state.clockByoyomi,
+            ccb: state.clockCurrentByoyomi,
+            lm: state.lastMove,
+            mc: state.moveCount,
+            igo: state.isGameOver,
+            hs: state.hasStarted
         };
     }
-    decompressState(c) {
-        if(c.board) return c;
+    
+    decompressState(comp) {
+        if (comp.board) return comp; // 古い形式との互換性
         return {
-            board:c.b.map(r=>r.map(s=>{if(s===0)return null; const p=s.split(','); return {type:+p[0], owner:+p[1], promoted:p[2]==='1', frozen:+p[3]||false, shielded:+p[4]||false, idaten:+p[5]||false, duration:+p[6]||0};})),
-            hands:c.h, turn:c.t, cards:c.c, clockTime:c.ct, clockByoyomi:c.cb, clockCurrentByoyomi:c.ccb, lastMove:c.lm, moveCount:c.mc, isGameOver:c.igo, hasStarted:c.hs,
-            gameMode:c.gm||'normal', points:c.pts||{0:0,1:0}, targetPoints:c.tp||0, sdPhase:c.sdp||0
+            board: comp.b.map(row => row.map(s => {
+                if (s === 0) return null;
+                const p = s.split(',');
+                return { type: +p[0], owner: +p[1], promoted: p[2]==='1', frozen: +p[3]||false, shielded: +p[4]||false, idaten: +p[5]||false, duration: +p[6]||0 };
+            })),
+            hands: comp.h,
+            turn: comp.t,
+            cards: comp.c,
+            clockTime: comp.ct,
+            clockByoyomi: comp.cb,
+            clockCurrentByoyomi: comp.ccb,
+            lastMove: comp.lm,
+            moveCount: comp.mc,
+            isGameOver: comp.igo,
+            hasStarted: comp.hs
         };
     }
+
     async syncState() {
-        const s={board:this.board, hands:this.hands, turn:this.turn, cards:this.cards, clockTime:this.clock.time, clockByoyomi:this.clock.inByoyomi, clockCurrentByoyomi:this.clock.currentByoyomi, lastMove:this.lastMove, moveCount:this.moveCount, isGameOver:this.isGameOver, hasStarted:this.hasStarted, gameMode:this.gameMode, points:this.points, targetPoints:this.targetPoints, sdPhase:this.sdPhase};
-        const c=this.compressState(s);
-        if(!isFirebaseReady){ if(this.bc) this.bc.postMessage({type:'sync', state:c}); return; }
-        try{ await update(ref(db, 'rooms/'+this.roomId), {gameState:JSON.stringify(c), lastUpdateUserId:currentUser.uid}); }catch(e){}
+        const stateObj = { board: this.board, hands: this.hands, turn: this.turn, cards: this.cards, clockTime: this.clock.time, clockByoyomi: this.clock.inByoyomi, clockCurrentByoyomi: this.clock.currentByoyomi, lastMove: this.lastMove, moveCount: this.moveCount, isGameOver: this.isGameOver, hasStarted: this.hasStarted };
+        const compressed = this.compressState(stateObj);
+
+        if (!isFirebaseReady || !currentUser) {
+            if (this.bc) this.bc.postMessage({ type: 'sync', state: compressed });
+            return;
+        }
+
+        const roomRef = ref(db, 'rooms/' + this.roomId);
+        try { await update(roomRef, { gameState: JSON.stringify(compressed), lastUpdateUserId: currentUser.uid }); } catch(e) {}
     }
-    exitOnline() { this.isOnline=false; this.roomId=null; this.myRole=null; if(this.unsubscribe){this.unsubscribe();this.unsubscribe=null;} if(this.bc){this.bc.close();this.bc=null;} document.getElementById('online-status').style.display='none'; this.initBoard(false); }
+
+    exitOnline() {
+        this.isOnline = false;
+        this.roomId = null;
+        this.myRole = null;
+        if (this.unsubscribe) { this.unsubscribe(); this.unsubscribe = null; }
+        if (this.bc) { this.bc.close(); this.bc = null; }
+        document.getElementById('online-status').style.display = 'none';
+        this.initBoard(false);
+    }
+
+    getPiece(x, y) {
+        if (x < 0 || x > 8 || y < 0 || y > 8) return null;
+        return this.board[y][x];
+    }
+
+    canMoveTo(x, y, owner) {
+        if (x < 0 || x > 8 || y < 0 || y > 8) return false;
+        const p = this.board[y][x];
+        if (p && p.type === WALL) return false;
+        if (p && p.owner !== owner && p.shielded) return false;
+        return p === null || p.owner !== owner;
+    }
 
     getPieceMovement(piece) {
         if (piece.idaten) return MOVE_DIRS.IDATEN;
-        const t=piece.type, p=piece.promoted, o=piece.owner;
-        if(t===KING) return MOVE_DIRS.KING;
-        if(t===GOLD||(p&&(t===PAWN||t===LANCE||t===KNIGHT||t===SILVER))) return MOVE_DIRS.GOLD[o];
-        if(t===PAWN) return MOVE_DIRS.PAWN[o]; if(t===KNIGHT) return MOVE_DIRS.KNIGHT[o]; if(t===SILVER) return MOVE_DIRS.SILVER[o]; if(t===LANCE) return MOVE_DIRS.LANCE[o];
-        if(t===BISHOP) return p?MOVE_DIRS.PRO_BISHOP:MOVE_DIRS.BISHOP; if(t===ROOK) return p?MOVE_DIRS.PRO_ROOK:MOVE_DIRS.ROOK;
+        const type = piece.type;
+        const p = piece.promoted;
+        const o = piece.owner;
+
+        if (type === KING) return MOVE_DIRS.KING;
+        if (type === GOLD || (p && (type === PAWN || type === LANCE || type === KNIGHT || type === SILVER))) return MOVE_DIRS.GOLD[o];
+        if (type === PAWN) return MOVE_DIRS.PAWN[o];
+        if (type === KNIGHT) return MOVE_DIRS.KNIGHT[o];
+        if (type === SILVER) return MOVE_DIRS.SILVER[o];
+        if (type === LANCE) return MOVE_DIRS.LANCE[o];
+        if (type === BISHOP) return p ? MOVE_DIRS.PRO_BISHOP : MOVE_DIRS.BISHOP;
+        if (type === ROOK) return p ? MOVE_DIRS.PRO_ROOK : MOVE_DIRS.ROOK;
         return [];
     }
-    canAttackTarget(fx, fy, piece, tx, ty) {
-        if(piece.frozen || piece.type===WALL) return false;
-        const moves = this.getPieceMovement(piece);
-        for(let m of moves) {
-            if(m.slide) {
-                if(m.dx!==0 && (tx-fx)*m.dx<=0) continue; if(m.dy!==0 && (ty-fy)*m.dy<=0) continue;
-                if(m.dx===0 && tx!==fx) continue; if(m.dy===0 && ty!==fy) continue; if(m.dx!==0 && m.dy!==0 && Math.abs(tx-fx)!==Math.abs(ty-fy)) continue;
-                let cx=fx+m.dx, cy=fy+m.dy;
-                while(cx>=0&&cx<=8&&cy>=0&&cy<=8){ if(cx===tx&&cy===ty) return true; if(this.board[cy][cx]) break; cx+=m.dx; cy+=m.dy; }
-            } else { if(fx+m.dx===tx && fy+m.dy===ty) return true; }
+
+    canAttackTarget(fromX, fromY, piece, targetX, targetY) {
+        if (piece.frozen || piece.type === WALL) return false;
+
+        const movements = this.getPieceMovement(piece);
+        for (let i = 0; i < movements.length; i++) {
+            const move = movements[i];
+            if (move.slide) {
+                // 方向のチェックを数学的な掛け算に置き換え、劇的に高速化
+                if (move.dx !== 0 && (targetX - fromX) * move.dx <= 0) continue;
+                if (move.dy !== 0 && (targetY - fromY) * move.dy <= 0) continue;
+                if (move.dx === 0 && targetX !== fromX) continue;
+                if (move.dy === 0 && targetY !== fromY) continue;
+                if (move.dx !== 0 && move.dy !== 0 && Math.abs(targetX - fromX) !== Math.abs(targetY - fromY)) continue;
+
+                let cx = fromX + move.dx;
+                let cy = fromY + move.dy;
+                while (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    if (cx === targetX && cy === targetY) return true;
+                    const p = this.board[cy][cx];
+                    if (p !== null) break; 
+                    cx += move.dx;
+                    cy += move.dy;
+                }
+            } else {
+                if (fromX + move.dx === targetX && fromY + move.dy === targetY) return true;
+            }
         }
         return false;
     }
+
     getRawMoves(x, y) {
-        const piece = this.board[y][x]; if(!piece || piece.frozen || piece.type===WALL) return [];
+        const piece = this.board[y][x];
+        if (!piece || piece.frozen || piece.type === WALL) return [];
+
+        const movements = this.getPieceMovement(piece);
         let moves = [];
-        for(let m of this.getPieceMovement(piece)) {
-            if(m.slide) {
-                let cx=x+m.dx, cy=y+m.dy;
-                while(cx>=0&&cx<=8&&cy>=0&&cy<=8){
-                    const p=this.board[cy][cx]; if(p&&p.type===WALL) break; if(p&&p.owner!==piece.owner&&p.shielded) break;
-                    if(!p||p.owner!==piece.owner) moves.push({toX:cx,toY:cy}); if(p) break; cx+=m.dx; cy+=m.dy;
+        for (let i = 0; i < movements.length; i++) {
+            const move = movements[i];
+            if (move.slide) {
+                let cx = x + move.dx;
+                let cy = y + move.dy;
+                while (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    const p = this.board[cy][cx];
+                    if (p && p.type === WALL) break;
+                    if (p && p.owner !== piece.owner && p.shielded) break;
+                    
+                    if (p === null || p.owner !== piece.owner) {
+                        moves.push({toX: cx, toY: cy});
+                    }
+                    if (p !== null) break;
+                    
+                    cx += move.dx;
+                    cy += move.dy;
                 }
             } else {
-                let cx=x+m.dx, cy=y+m.dy;
-                if(cx>=0&&cx<=8&&cy>=0&&cy<=8){ const p=this.board[cy][cx]; if(p&&p.type===WALL) continue; if(p&&p.owner!==piece.owner&&p.shielded) continue; if(!p||p.owner!==piece.owner) moves.push({toX:cx,toY:cy}); }
+                let cx = x + move.dx;
+                let cy = y + move.dy;
+                if (cx >= 0 && cx <= 8 && cy >= 0 && cy <= 8) {
+                    const p = this.board[cy][cx];
+                    if (p && p.type === WALL) continue;
+                    if (p && p.owner !== piece.owner && p.shielded) continue;
+
+                    if (p === null || p.owner !== piece.owner) {
+                        moves.push({toX: cx, toY: cy});
+                    }
+                }
             }
         }
         return moves;
     }
+
     isInCheck(player) {
-        if (this.gameMode === 'point') return false; // ポイント将棋では王手なし
-        const kp = this.kingPos[player]; if(!kp) return true;
-        const opp = player===PLAYER?OPPONENT:PLAYER;
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) { const p=this.board[y][x]; if(p&&p.owner===opp&&!p.frozen&&p.type!==WALL) if(this.canAttackTarget(x,y,p,kp.x,kp.y)) return true; }
+        const kPos = this.kingPos[player];
+        if (!kPos) return true;
+        const {x: kingX, y: kingY} = kPos;
+
+        const opponent = player === PLAYER ? OPPONENT : PLAYER;
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === opponent && !p.frozen && p.type !== WALL) {
+                    if (this.canAttackTarget(x, y, p, kingX, kingY)) return true;
+                }
+            }
+        }
         return false;
     }
+
     testMoveUnchecks(from, to, player) {
-        if (this.gameMode === 'point') return true;
-        const toP = this.board[to.y][to.x]; let fromP = null, oKP = this.kingPos[player], mK = false;
-        if(from.x!==undefined){
-            fromP = this.board[from.y][from.x]; this.board[to.y][to.x]=fromP; this.board[from.y][from.x]=null;
-            if(fromP.type===KING){ this.kingPos[player]={x:to.x,y:to.y}; mK=true; }
-        } else { fromP={type:from.type, owner:player, promoted:false}; this.board[to.y][to.x]=fromP; }
-        const safe = !this.isInCheck(player);
-        if(from.x!==undefined){ this.board[from.y][from.x]=fromP; this.board[to.y][to.x]=toP; if(mK) this.kingPos[player]=oKP; } else this.board[to.y][to.x]=null;
-        return safe;
-    }
-    isNifu(x, player) { for(let y=0;y<9;y++){ const p=this.board[y][x]; if(p&&p.type===PAWN&&p.owner===player&&!p.promoted) return true; } return false; }
-    hasNoPlaceToGo(t, y, p) { if(p===PLAYER){ if(t===PAWN||t===LANCE) return y===0; if(t===KNIGHT) return y<=1; } else { if(t===PAWN||t===LANCE) return y===8; if(t===KNIGHT) return y>=7; } return false; }
-    isUchifuZume(x, y, player) {
-        if(this.gameMode === 'point') return false;
-        this.board[y][x] = {type:PAWN, owner:player, promoted:false};
-        const opp = player===PLAYER?OPPONENT:PLAYER;
-        let isMate = false; if(this.isInCheck(opp)) if(!this.hasAnyLegalMove(opp, false)) isMate = true;
-        this.board[y][x] = null; return isMate;
-    }
-    hasAnyLegalMove(player, checkU = false) {
-        const inC = this.isInCheck(player);
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) { const p=this.board[y][x]; if(p&&p.owner===player) for(let m of this.getRawMoves(x,y)) if(this.testMoveUnchecks({x,y},{x:m.toX,y:m.toY},player)) return true; }
-        // 持ち駒将棋かつサドンデス配置中以外は打てない
-        if (this.gameMode === 'point' && this.sdPhase !== 2) return false;
+        const toPiece = this.board[to.y][to.x];
+        let fromPiece = null;
+        let originalKingPos = this.kingPos[player];
+        let movedKing = false;
+        
+        if (from.x !== undefined) {
+            fromPiece = this.board[from.y][from.x];
+            this.board[to.y][to.x] = fromPiece;
+            this.board[from.y][from.x] = null;
+            if (fromPiece.type === KING) {
+                this.kingPos[player] = {x: to.x, y: to.y};
+                movedKing = true;
+            }
+        } else {
+            fromPiece = { type: from.type, owner: player, promoted: false };
+            this.board[to.y][to.x] = fromPiece;
+        }
 
-        const uHands = [...new Set(this.hands[player])];
-        for(let t of uHands) for(let y=0;y<9;y++) for(let x=0;x<9;x++) if(!this.board[y][x]) {
-            if(t===PAWN&&this.isNifu(x,player)) continue; if(this.hasNoPlaceToGo(t,y,player)) continue;
-            let safe=true; if(inC) safe=this.testMoveUnchecks({type:t},{x,y},player);
-            if(safe) { if(t===PAWN&&checkU&&this.isUchifuZume(x,y,player)) continue; return true; }
+        const isSafe = !this.isInCheck(player);
+
+        if (from.x !== undefined) {
+            this.board[from.y][from.x] = fromPiece;
+            this.board[to.y][to.x] = toPiece;
+            if (movedKing) {
+                this.kingPos[player] = originalKingPos;
+            }
+        } else {
+            this.board[to.y][to.x] = null;
+        }
+
+        return isSafe;
+    }
+
+    isNifu(x, player) {
+        for (let y = 0; y < 9; y++) {
+            const p = this.board[y][x];
+            if (p && p.type === PAWN && p.owner === player && !p.promoted) return true;
         }
         return false;
     }
-    getAllLegalMoves(player, checkU = true) {
-        let am = []; const inC = this.isInCheck(player);
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) { const p=this.board[y][x]; if(p&&p.owner===player) for(let m of this.getRawMoves(x,y)) if(this.testMoveUnchecks({x,y},{x:m.toX,y:m.toY},player)) am.push({from:{x,y}, to:{x:m.toX,y:m.toY}}); }
-        if (this.gameMode === 'point' && this.sdPhase !== 2) return am; // 打てない
 
-        const uHands = [...new Set(this.hands[player])];
-        for(let t of uHands) for(let y=0;y<9;y++) for(let x=0;x<9;x++) if(!this.board[y][x]) {
-            if(t===PAWN&&this.isNifu(x,player)) continue; if(this.hasNoPlaceToGo(t,y,player)) continue;
-            let safe=true; if(inC) safe=this.testMoveUnchecks({type:t},{x,y},player);
-            if(safe) { if(t===PAWN&&checkU&&this.isUchifuZume(x,y,player)) continue; am.push({from:{type:t}, to:{x,y}}); }
+    // ★修正部分：ここで呼び出されていた関数が存在せずエラーで止まっていました
+    hasNoPlaceToGo(type, y, player) {
+        if (player === PLAYER) {
+            if (type === PAWN || type === LANCE) return y === 0;
+            if (type === KNIGHT) return y <= 1;
+        } else {
+            if (type === PAWN || type === LANCE) return y === 8;
+            if (type === KNIGHT) return y >= 7;
         }
-        return am;
+        return false;
     }
-    calcLegalMovesForSelected() {
-        this.legalMoves = []; if(!this.selected) { this.render(); return; }
-        const p = this.turn, inC = this.isInCheck(p);
-        if(this.selected.type==='board') {
-            for(let m of this.getRawMoves(this.selected.x, this.selected.y)) if(this.testMoveUnchecks({x:this.selected.x,y:this.selected.y},{x:m.toX,y:m.toY},p)) this.legalMoves.push({toX:m.toX,toY:m.toY});
-        } else if(this.selected.type==='hand' && (this.gameMode !== 'point' || this.sdPhase === 2)) {
-            const t = this.selected.pieceType;
-            // サドンデス配置時は自陣3列のみ
-            const yMin = (this.gameMode==='point' && p===PLAYER) ? 6 : 0;
-            const yMax = (this.gameMode==='point' && p===OPPONENT) ? 2 : 8;
-            for(let y=yMin;y<=yMax;y++) for(let x=0;x<9;x++) if(!this.board[y][x]) {
-                if(t===PAWN&&this.isNifu(x,p)) continue; if(this.hasNoPlaceToGo(t,y,p)) continue;
-                let safe=true; if(inC) safe=this.testMoveUnchecks({type:t},{x,y},p);
-                if(safe) { if(t===PAWN&&this.isUchifuZume(x,y,p)) continue; this.legalMoves.push({toX:x,toY:y}); }
+
+    hasAnyLegalMove(player, checkUchifu = false) {
+        const inCheck = this.isInCheck(player);
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === player) {
+                    const rawMoves = this.getRawMoves(x, y);
+                    for (let i = 0; i < rawMoves.length; i++) {
+                        const m = rawMoves[i];
+                        if (this.testMoveUnchecks({x, y}, {x: m.toX, y: m.toY}, player)) return true;
+                    }
+                }
             }
         }
-        this.render();
-    }
-
-    handleClick(type, x, y, pt=null, cI=null) {
-        if(this.isGameOver) return;
-        if(this.isOnline && this.myRole!==null && this.turn!==this.myRole && this.sdPhase!==2) return;
-        if(this.cpuLevel && this.turn===OPPONENT && this.sdPhase!==2) return;
-
-        // サドンデス配置フェーズ
-        if (this.sdPhase === 2) {
-            const player = this.isOnline ? this.myRole : (this.cpuLevel ? PLAYER : this.turn);
-            if (this.sdReady[player]) return;
-            if (type === 'board') {
-                if (this.selected && this.selected.type === 'hand') {
-                    if (this.legalMoves.find(m=>m.toX===x&&m.toY===y)) {
-                        this.executeMove(this.selected, {x, y});
-                        if (this.hands[player].length === 0) {
-                            this.sdReady[player] = true;
-                            if (this.isOnline) this.sendActionAsync({type: 'sd_place', player, board: this.board});
-                            this.checkSuddenDeathReady();
+        const uniqueHands = [...new Set(this.hands[player])];
+        for (let i = 0; i < uniqueHands.length; i++) {
+            const type = uniqueHands[i];
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        let isSafe = true;
+                        if (inCheck) isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
+                        if (isSafe) {
+                            if (type === PAWN && checkUchifu && this.isUchifuZume(x, y, player)) continue;
+                            return true;
                         }
-                    } else this.selected = null;
+                    }
                 }
             }
-            return;
         }
-
-        if(!this.hasStarted) { this.hasStarted=true; this.clock.start(); if(this.isOnline) this.syncStateAsync(); }
-        if(type==='card') {
-            const p=pt; if(p===this.turn&&!this.targetingCard) this.useCard(p, cI);
-            else if(this.targetingCard&&p===this.turn&&cI===this.targetingCard.index) { this.targetingCard=null; this.updateMessage(this.turn===PLAYER?"先手":"後手"); this.render(); }
-            return;
-        }
-        if(this.targetingCard&&type==='board') { this.resolveCardTarget(x,y); return; }
-        if(type==='board') {
-            const cP = this.board[y][x];
-            if(!this.selected) { if(cP&&cP.owner===this.turn) { this.selected={type:'board',x,y}; this.calcLegalMovesForSelected(); } }
-            else {
-                if(this.legalMoves.find(m=>m.toX===x&&m.toY===y)) this.executeMove(this.selected, {x,y});
-                else if(cP&&cP.owner===this.turn) { this.selected={type:'board',x,y}; this.calcLegalMovesForSelected(); }
-                else { this.selected=null; this.legalMoves=[]; this.render(); }
-            }
-        }
+        return false;
     }
-    handleHandClick(p, type) {
-        if(this.isGameOver) return;
+
+    getAllLegalMoves(player, checkUchifu = true) {
+        let allMoves = [];
+        const inCheck = this.isInCheck(player);
         
-        // サドンデス配置中
-        if (this.sdPhase === 2) {
-            const activePlayer = this.isOnline ? this.myRole : (this.cpuLevel ? PLAYER : this.turn);
-            if (p === activePlayer && !this.sdReady[p]) {
-                this.selected = {type:'hand', pieceType:type};
-                this.calcLegalMovesForSelected();
-            }
-            return;
-        }
-
-        if(this.isOnline && this.myRole!==null && this.turn!==this.myRole) return;
-        if(this.cpuLevel && this.turn===OPPONENT) return;
-        if (this.gameMode === 'point') return; // 打てない
-
-        if(this.turn===p) { this.selected={type:'hand', pieceType:type}; this.calcLegalMovesForSelected(); }
-    }
-    useCard(p, cI, isR=false, rIdx=-1) {
-        if (this.gameMode === 'point') { if(!isR) this.updateMessage("ポイント将棋ではカードを使用できません。"); return; } // ★ 今回は簡略化のためポイント将棋でのカード使用を不可に
-        const c=this.cards[p][cI];
-        if(c===CARD_STEAL) {
-            const opp=p===PLAYER?OPPONENT:PLAYER; if(this.hands[opp].length===0) { if(!isR) this.updateMessage("持駒なし"); return; }
-            const sIdx=isR?rIdx:Math.floor(Math.random()*this.hands[opp].length); this.hands[p].push(this.hands[opp].splice(sIdx,1)[0]);
-            let msg=isR?`強奪発動`:`強奪発動！`; if(!isR) this.pendingAction={type:'card',cardType:CARD_STEAL,player:p,cardIndex:cI,rIdx:sIdx};
-            this.cards[p].splice(cI,1); this.render(); if(!isR) window.showModal(msg,"",[{text:"確認",onClick:()=>{window.hideModal();this.endTurn();}}]); else this.endTurn();
-        } else {
-            this.targetingCard={card:c, player:p, index:cI}; this.selected=null; this.legalMoves=[];
-            if(!isR) { this.updateMessage(c+"発動待ち"); this.render(); }
-        }
-    }
-    resolveCardTarget(x, y, isR=false) {
-        const tp=this.board[y][x], c=this.targetingCard.card, p=this.targetingCard.player; let s=false;
-        if(c===CARD_WALL) { if(!tp) { this.board[y][x]={type:WALL,owner:-1,duration:4}; s=true; } }
-        else if(c===CARD_FREEZE) { if(tp&&tp.owner!==p&&tp.type!==WALL) { tp.frozen=2; s=true; } }
-        else if(c===CARD_SHIELD) { if(tp&&tp.owner===p) { tp.shielded=2; s=true; } }
-        else if(c===CARD_IDATEN) { if(tp&&tp.owner===p) { tp.idaten=2; s=true; } }
-        if(s) {
-            if(!isR) this.pendingAction={type:'card',cardType:c,player:p,cardIndex:this.targetingCard.index,target:{x,y}};
-            this.cards[p].splice(this.targetingCard.index,1); this.targetingCard=null; this.render();
-            if(!isR) window.showModal("発動",`${c}！`,[{text:"確認",onClick:()=>{window.hideModal();this.endTurn();}}]); else this.endTurn();
-        } else if(!isR) this.updateMessage("対象不正");
-    }
-    isEnemyTerritory(y, p) { return p===PLAYER?y<=2:y>=6; }
-    canPromote(m, p) {
-        if(m.from.type) return false; const tp=this.board[m.from.y][m.from.x];
-        if(!tp||tp.promoted||tp.type===KING||tp.type===GOLD||tp.type===WALL) return false;
-        return this.isEnemyTerritory(m.to.y, p)||this.isEnemyTerritory(m.from.y, p);
-    }
-    executeMove(from, to, aP=null) {
-        let mP, isPA=false, fP=false;
-        const player = (this.sdPhase === 2) ? ((from.type === 'hand' || from.type !== undefined) ? this.board[to.y]?.[to.x]?.owner || (this.isOnline?this.myRole:this.turn) : this.board[from.y][from.x].owner) : this.turn;
-        
-        if(from.type==='board'||from.x!==undefined) {
-            mP = this.board[from.y][from.x]; const tP = this.board[to.y][to.x];
-            if(tP) {
-                if (this.gameMode === 'point') {
-                    this.points[player] += PIECE_POINTS[tP.type];
-                    this.captured[player].push(tP.type);
-                } else {
-                    this.hands[player].push(tP.type);
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.owner === player) {
+                    const rawMoves = this.getRawMoves(x, y);
+                    for (const m of rawMoves) {
+                        if (this.testMoveUnchecks({x, y}, {x: m.toX, y: m.toY}, player)) {
+                            allMoves.push({from: {x,y}, to: {x: m.toX, y: m.toY}});
+                        }
+                    }
                 }
             }
-            this.board[from.y][from.x]=null; this.board[to.y][to.x]=mP;
-            if(mP.type===KING) this.kingPos[mP.owner]={x:to.x,y:to.y};
-            if(!mP.promoted&&mP.type!==KING&&mP.type!==GOLD) {
-                if(this.isEnemyTerritory(to.y, player)||this.isEnemyTerritory(from.y, player)) {
-                    if(this.hasNoPlaceToGo(mP.type, to.y, player)) fP=true; else isPA=true;
+        }
+
+        const uniqueHands = [...new Set(this.hands[player])];
+        for (const type of uniqueHands) {
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        
+                        let isSafe = true;
+                        if (inCheck) {
+                            isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
+                        }
+                        
+                        if (isSafe) {
+                            if (type === PAWN && checkUchifu && this.isUchifuZume(x, y, player)) continue;
+                            allMoves.push({from: {type: type}, to: {x, y}});
+                        }
+                    }
                 }
             }
-        } else {
-            const t=from.pieceType||from.type, idx=this.hands[player].indexOf(t);
-            if(idx>-1) this.hands[player].splice(idx,1);
-            mP={type:t, owner:player, promoted:false}; this.board[to.y][to.x]=mP;
         }
-        this.lastMove={from,to}; this.selected=null; this.legalMoves=[];
+        return allMoves;
+    }
+
+    isUchifuZume(x, y, player) {
+        this.board[y][x] = { type: PAWN, owner: player, promoted: false };
+        const opponent = player === PLAYER ? OPPONENT : PLAYER;
+        let isMate = false;
         
-        if (this.sdPhase === 2) {
-            this.render(); return; // 配置時はターン終了処理しない
+        if (this.isInCheck(opponent)) {
+            if (!this.hasAnyLegalMove(opponent, false)) {
+                isMate = true;
+            }
         }
-
-        if(fP||aP===true) { mP.promoted=true; this.pendingAction={type:'move',move:{from,to,promote:true}}; this.endTurn(); }
-        else if(aP===false) { this.pendingAction={type:'move',move:{from,to,promote:false}}; this.endTurn(); }
-        else if(isPA) {
-            if(this.cpuLevel && this.turn === OPPONENT) { mP.promoted = Math.random() > 0.5; this.pendingAction={type:'move',move:{from,to,promote:mP.promoted}}; this.endTurn(); }
-            else this.showPromoteModal(mP, to, from);
-        }
-        else { this.pendingAction={type:'move',move:{from,to,promote:false}}; this.endTurn(); }
-    }
-    showPromoteModal(p, to, from) { window.showModal("成りますか？","",[{text:"成る",onClick:()=>{p.promoted=true;this.pendingAction={type:'move',move:{from,to,promote:true}};window.hideModal();this.endTurn();}},{text:"成らない",onClick:()=>{this.pendingAction={type:'move',move:{from,to,promote:false}};window.hideModal();this.endTurn();}}]); }
-    
-    endTurn() {
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) { let p=this.board[y][x]; if(p){ if(p.type===WALL){p.duration--;if(p.duration<=0)this.board[y][x]=null;} if(p.frozen&&p.owner===this.turn){p.frozen--;if(p.frozen<=0)p.frozen=false;} if(p.idaten&&p.owner===this.turn){p.idaten--;if(p.idaten<=0)p.idaten=false;} if(p.shielded&&p.owner===this.turn){p.shielded--;if(p.shielded<=0)p.shielded=false;} } }
-        this.moveCount++; this.turn=this.turn===PLAYER?OPPONENT:PLAYER;
-        this.postTurnProcessing();
+        
+        this.board[y][x] = null;
+        return isMate;
     }
 
-    endGameWithWinner(winner, reason) {
-        this.clock.stop();
-        this.isGameOver = true;
-        const wStr = winner === PLAYER ? "先手" : "後手";
-        window.showModal("決着", `${wStr}の勝ちです！<br>(${reason})`, [{text: "閉じる", onClick: window.hideModal}]);
-        this.updateMessage(`${wStr}の勝ち！`);
+    calcLegalMovesForSelected() {
+        this.legalMoves = [];
+        if (!this.selected) {
+            this.render();
+            return;
+        }
+        
+        const player = this.turn;
+        const inCheck = this.isInCheck(player);
+        
+        if (this.selected.type === 'board') {
+            const sx = this.selected.x, sy = this.selected.y;
+            const rawMoves = this.getRawMoves(sx, sy);
+            for (let i = 0; i < rawMoves.length; i++) {
+                const m = rawMoves[i];
+                if (this.testMoveUnchecks({x: sx, y: sy}, {x: m.toX, y: m.toY}, player)) {
+                    this.legalMoves.push({toX: m.toX, toY: m.toY});
+                }
+            }
+        } else if (this.selected.type === 'hand') {
+            const type = this.selected.pieceType;
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    if (this.board[y][x] === null) {
+                        if (type === PAWN && this.isNifu(x, player)) continue;
+                        if (this.hasNoPlaceToGo(type, y, player)) continue;
+                        
+                        let isSafe = true;
+                        if (inCheck) {
+                            isSafe = this.testMoveUnchecks({type: type}, {x, y}, player);
+                        }
+                        
+                        if (isSafe) {
+                            if (type === PAWN && this.isUchifuZume(x, y, player)) continue;
+                            this.legalMoves.push({toX: x, toY: y});
+                        }
+                    }
+                }
+            }
+        }
         this.render();
+    }
+
+
+    handleClick(type, x, y, pieceType = null, cardIndex = null) {
+        if (this.isGameOver) return;
+        if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) return;
+        if (this.cpuLevel && this.turn === OPPONENT) return;
+
+        if (!this.hasStarted) {
+            this.hasStarted = true;
+            this.clock.start();
+            if(this.isOnline) this.syncStateAsync();
+        }
+
+        if (type === 'card') {
+            const player = pieceType;
+            if (player === this.turn && !this.targetingCard) {
+                this.useCard(player, cardIndex);
+            } else if (this.targetingCard && player === this.turn && cardIndex === this.targetingCard.index) {
+                this.targetingCard = null;
+                this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+                this.render();
+            }
+            return;
+        }
+
+        if (this.targetingCard && type === 'board') {
+            this.resolveCardTarget(x, y);
+            return;
+        }
+
+        if (type === 'board') {
+            const clickedPiece = this.board[y][x];
+
+            if (!this.selected) {
+                if (clickedPiece && clickedPiece.owner === this.turn) {
+                    this.selected = { type: 'board', x, y };
+                    this.calcLegalMovesForSelected();
+                }
+            } 
+            else {
+                const isLegalMove = this.legalMoves.find(m => m.toX === x && m.toY === y);
+                if (isLegalMove) {
+                    this.executeMove(this.selected, {x, y});
+                } 
+                else if (clickedPiece && clickedPiece.owner === this.turn) {
+                    this.selected = { type: 'board', x, y };
+                    this.calcLegalMovesForSelected();
+                } 
+                else {
+                    this.selected = null;
+                    this.legalMoves = [];
+                    this.render();
+                }
+            }
+        }
+    }
+    
+    handleHandClick(player, type) {
+        if (this.isGameOver) return;
+        if (this.isOnline && this.myRole !== null && this.turn !== this.myRole) return;
+        if (this.cpuLevel && this.turn === OPPONENT) return;
+
+        if (this.turn === player) {
+            this.selected = { type: 'hand', pieceType: type };
+            this.calcLegalMovesForSelected();
+        }
+    }
+
+    // isRemote と rIdx (強奪のランダム対象) を受け取るように変更
+    useCard(player, cardIndex, isRemote = false, rIdx = -1) {
+        const card = this.cards[player][cardIndex];
+        if (card === CARD_STEAL) {
+            const opp = player === PLAYER ? OPPONENT : PLAYER;
+            if (this.hands[opp].length === 0) {
+                if (!isRemote) this.updateMessage("相手の持駒がないため「強奪」は使用できません");
+                return;
+            }
+
+            const stealIdx = isRemote ? rIdx : Math.floor(Math.random() * this.hands[opp].length);
+            const stolen = this.hands[opp].splice(stealIdx, 1)[0];
+            this.hands[player].push(stolen);
+            let msg = isRemote ? `相手が「強奪」を発動しました` : `${card}発動！相手の駒を奪いました`;
+            
+            // アクションとして記録
+            if (!isRemote) this.pendingAction = { type: 'card', cardType: CARD_STEAL, player, cardIndex, rIdx: stealIdx };
+            
+            this.cards[player].splice(cardIndex, 1);
+            this.render();
+            
+            if (!isRemote) {
+                window.showModal(msg, "", [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
+            } else {
+                this.endTurn();
+            }
+        } else {
+            this.targetingCard = { card, player, index: cardIndex };
+            this.selected = null;
+            this.legalMoves = [];
+            
+            if (!isRemote) {
+                let msg = "";
+                if (card === CARD_WALL) msg = "壁を設置する空きマスを選択してください";
+                if (card === CARD_FREEZE) msg = "氷結させる敵の駒を選択してください";
+                if (card === CARD_SHIELD) msg = "盾を付与する味方の駒を選択してください";
+                if (card === CARD_IDATEN) msg = "韋駄天にする味方の駒を選択してください";
+                
+                this.updateMessage(msg);
+                this.render();
+            }
+        }
+    }
+
+    resolveCardTarget(x, y, isRemote = false) {
+        const targetPiece = this.board[y][x];
+        const card = this.targetingCard.card;
+        const player = this.targetingCard.player;
+        let success = false;
+
+        if (card === CARD_WALL) {
+            if (!targetPiece) {
+                this.board[y][x] = { type: WALL, owner: -1, duration: 4 };
+                success = true;
+            }
+        } else if (card === CARD_FREEZE) {
+            if (targetPiece && targetPiece.owner !== player && targetPiece.type !== WALL) {
+                targetPiece.frozen = 2;
+                success = true;
+            }
+        } else if (card === CARD_SHIELD) {
+            if (targetPiece && targetPiece.owner === player) {
+                targetPiece.shielded = 2;
+                success = true;
+            }
+        } else if (card === CARD_IDATEN) {
+            if (targetPiece && targetPiece.owner === player) {
+                targetPiece.idaten = 2;
+                success = true;
+            }
+        }
+
+        if (success) {
+            if (!isRemote) this.pendingAction = { type: 'card', cardType: card, player, cardIndex: this.targetingCard.index, target: {x, y} };
+            this.cards[player].splice(this.targetingCard.index, 1);
+            this.targetingCard = null;
+            this.render();
+            
+            if (!isRemote) {
+                window.showModal("カード発動", `${card}を発動しました！`, [{text: "確認", onClick: () => { window.hideModal(); this.endTurn(); }}]);
+            } else {
+                this.endTurn();
+            }
+        } else {
+            if (!isRemote) this.updateMessage("対象が不正です。もう一度選ぶかカードを押してキャンセル");
+        }
+    }
+
+    isEnemyTerritory(y, player) { return player === PLAYER ? y <= 2 : y >= 6; }
+
+    canPromote(move, player) {
+        if (move.from.type) return false;
+        const piece = this.board[move.from.y][move.from.x];
+        if (!piece || piece.promoted || piece.type === KING || piece.type === GOLD || piece.type === WALL) return false;
+        return this.isEnemyTerritory(move.to.y, player) || this.isEnemyTerritory(move.from.y, player);
+    }
+
+    executeMove(from, to, autoPromote = null) {
+        let movedPiece;
+        let isPromoteAttempt = false;
+        let forcePromote = false;
+
+        if (from.type === 'board' || from.x !== undefined) {
+            movedPiece = this.board[from.y][from.x];
+            const targetPiece = this.board[to.y][to.x];
+
+            if (targetPiece) {
+                this.hands[this.turn].push(targetPiece.type);
+            }
+            this.board[from.y][from.x] = null;
+            this.board[to.y][to.x] = movedPiece;
+
+            if (movedPiece.type === KING) {
+                this.kingPos[movedPiece.owner] = {x: to.x, y: to.y};
+            }
+
+            if (!movedPiece.promoted && movedPiece.type !== KING && movedPiece.type !== GOLD) {
+                if (this.isEnemyTerritory(to.y, this.turn) || this.isEnemyTerritory(from.y, this.turn)) {
+                    if (this.hasNoPlaceToGo(movedPiece.type, to.y, this.turn)) forcePromote = true;
+                    else isPromoteAttempt = true;
+                }
+            }
+        } else if (from.type === 'hand' || from.type !== undefined) {
+            const type = from.pieceType || from.type;
+            const index = this.hands[this.turn].indexOf(type);
+            if (index > -1) this.hands[this.turn].splice(index, 1);
+            movedPiece = { type: type, owner: this.turn, promoted: false };
+            this.board[to.y][to.x] = movedPiece;
+        }
+
+        this.lastMove = { from, to };
+        this.selected = null;
+        this.legalMoves = [];
+
+        if (forcePromote || autoPromote === true) {
+            movedPiece.promoted = true;
+            this.pendingAction = { type: 'move', move: {from, to, promote: true} };
+            this.endTurn();
+        } else if (autoPromote === false) {
+            this.pendingAction = { type: 'move', move: {from, to, promote: false} };
+            this.endTurn();
+        } else if (isPromoteAttempt) {
+            this.showPromoteModal(movedPiece, to, from);
+        } else {
+            this.pendingAction = { type: 'move', move: {from, to, promote: false} };
+            this.endTurn();
+        }
+    }
+
+    showPromoteModal(piece, to, from) {
+        window.showModal("成りますか？", "", [
+            { text: "成る", onClick: () => { 
+                piece.promoted = true; 
+                this.pendingAction = { type: 'move', move: {from, to, promote: true} };
+                window.hideModal(); 
+                this.endTurn(); 
+            } },
+            { text: "成らない", onClick: () => { 
+                this.pendingAction = { type: 'move', move: {from, to, promote: false} };
+                window.hideModal(); 
+                this.endTurn(); 
+            } }
+        ]);
+    }
+
+    endTurn() {
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                let p = this.board[y][x];
+                if (p) {
+                    if (p.type === WALL) { p.duration--; if (p.duration <= 0) this.board[y][x] = null; }
+                    if (p.frozen && p.owner === this.turn) { p.frozen--; if (p.frozen <= 0) p.frozen = false; }
+                    if (p.idaten && p.owner === this.turn) { p.idaten--; if (p.idaten <= 0) p.idaten = false; }
+                    if (p.shielded && p.owner === this.turn) { p.shielded--; if (p.shielded <= 0) p.shielded = false; }
+                }
+            }
+        }
+
+        this.moveCount++;
+        this.turn = this.turn === PLAYER ? OPPONENT : PLAYER;
+        
+        // 通信の二重発生を防ぐため、ここでは描画や送信を行わず、直ぐに後処理へ移行する
+        this.postTurnProcessing();
     }
 
     postTurnProcessing() {
         let isMate = false;
-        if (this.gameMode === 'point') {
-            const target = this.sdPhase === 3 ? 3 : this.targetPoints;
-            if (this.points[PLAYER] >= target) { this.endGameWithWinner(PLAYER, `${target}pt先取`); return; }
-            if (this.points[OPPONENT] >= target) { this.endGameWithWinner(OPPONENT, `${target}pt先取`); return; }
-            
-            let pk = false, ok = false, other = false;
-            for(let y=0;y<9;y++) for(let x=0;x<9;x++) {
-                const p = this.board[y][x];
-                if(p && p.type !== WALL) { if(p.type === KING) { if(p.owner===PLAYER) pk=true; else ok=true; } else other=true; }
-            }
-            let is78 = (this.points[PLAYER] === 78 && this.points[OPPONENT] === 78);
-            if ((is78 && !other) || (!other && (!pk || !ok))) {
-                if (!other && pk !== ok && !is78) { this.endGameWithWinner(pk ? PLAYER : OPPONENT, "玉のみ生存"); return; }
-                this.clock.stop();
-                window.showModal("サドンデス！", "盤面が全滅、または手詰まりです。<br>サドンデス延長戦に突入します！", [{text: "駒を選ぶ", onClick: () => { window.hideModal(); this.startSuddenDeath(); }}]);
-                return;
-            }
-        } else {
-            if(!this.hasAnyLegalMove(this.turn, true)) { isMate=true; this.endGameWithWinner(this.turn===PLAYER?OPPONENT:PLAYER, "詰み"); }
+        if (!this.hasAnyLegalMove(this.turn, true)) {
+            this.clock.stop();
+            const winner = this.turn === PLAYER ? "後手" : "先手";
+            let msg = `${winner}の勝ちです！(詰み)`;
+            this.updateMessage(msg);
+            this.isGameOver = true;
+            isMate = true;
+            window.showModal("決着", msg, [{text: "閉じる", onClick: window.hideModal}]);
         }
 
-        if(!isMate) {
-            if (this.gameMode !== 'point' && this.moveCount%10===0) { this.cards[PLAYER].push(CARD_TYPES[Math.floor(Math.random()*5)]); this.cards[OPPONENT].push(CARD_TYPES[Math.floor(Math.random()*5)]); if(!this.cpuLevel) window.showModal("支給", "10手経過、カード支給", [{text:"確認", onClick:window.hideModal}]); }
-            if(this.isInCheck(this.turn)) this.updateMessage("王手！"); else if(!this.targetingCard) this.updateMessage(this.turn===PLAYER?"先手":"後手");
+        let modalTriggered = false;
+        if (!isMate && this.moveCount % 10 === 0) {
+            this.cards[PLAYER].push(CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)]);
+            this.cards[OPPONENT].push(CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)]);
+            modalTriggered = true;
+        }
+
+        if (!isMate) {
+            if (this.isInCheck(this.turn)) {
+                this.updateMessage("王手！");
+            } else if (!this.targetingCard) {
+                this.updateMessage(this.turn === PLAYER ? "先手の番です" : "後手の番です");
+            }
             this.clock.switchTurn(this.turn);
         }
+
+        // 状態が完全に確定してから、1回だけ画面を描画
         this.render();
-        if(this.isOnline && this.pendingAction) { this.sendActionAsync(this.pendingAction); this.pendingAction=null; }
-        if(this.cpuLevel && this.turn===OPPONENT && !this.isGameOver) setTimeout(()=>this.cpuThink(),50);
-    }
 
-    // --- サドンデス ---
-    startSuddenDeath() {
-        this.sdPhase = 1;
-        this.updateMessage("サドンデス 駒選択中...");
-        if (this.isOnline && this.myRole === OPPONENT) { this.showSDSelectionUI(OPPONENT); }
-        else if (this.isOnline && this.myRole === PLAYER) { this.showSDSelectionUI(PLAYER); }
-        else if (this.cpuLevel) {
-            this.showSDSelectionUI(PLAYER);
-            this.cpuSelectSDPieces();
-        } else {
-            // ローカル2人対戦（順番に選ばせる）
-            this.showSDSelectionUI(PLAYER, () => {
-                this.showSDSelectionUI(OPPONENT);
-            });
+        // ★ アクション（差分）があれば送信してクリア（これが軽量化の要）
+        if (this.isOnline && this.pendingAction) {
+            this.sendActionAsync(this.pendingAction);
+            this.pendingAction = null;
+        }
+
+        if (modalTriggered && !this.cpuLevel) {
+            window.showModal("カード支給", "📜 計10手経過！両者に特殊カード支給！", [{text: "確認", onClick: window.hideModal}]);
+        }
+
+        // CPUのターン
+        if (this.cpuLevel && this.turn === OPPONENT && !this.isGameOver) {
+            setTimeout(() => this.cpuThink(), 50);
         }
     }
 
-    showSDSelectionUI(player, onFinish = null) {
-        const overlay = document.getElementById('sd-overlay');
-        const list = document.getElementById('sd-pieces');
-        const btn = document.getElementById('sd-confirm-btn');
-        const costEl = document.getElementById('sd-current-cost');
-        
-        list.innerHTML = ''; let cost = 0; let selected = [];
-        
-        const caps = [...this.captured[player]].sort((a,b)=>PIECE_POINTS[b]-PIECE_POINTS[a]);
-        caps.forEach((type, idx) => {
-            const el = document.createElement('div');
-            el.className = 'sd-piece piece bg-white';
-            el.innerText = pieceStrs[type][0];
-            el.onclick = () => {
-                const pt = PIECE_POINTS[type];
-                const sIdx = selected.indexOf(idx);
-                if (sIdx > -1) { selected.splice(sIdx, 1); el.classList.remove('selected'); cost -= pt; }
-                else {
-                    if (cost + pt <= 12) { selected.push(idx); el.classList.add('selected'); cost += pt; }
-                }
-                costEl.innerText = cost;
-                if (cost > 0 && cost <= 12) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); }
-                else { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); }
-            };
-            list.appendChild(el);
-        });
-
-        btn.onclick = () => {
-            this.hands[player] = selected.map(i => caps[i]);
-            overlay.style.display = 'none';
-            if (onFinish) onFinish();
-            else this.checkSDFinishSelection();
-        };
-
-        overlay.style.display = 'flex';
-        costEl.innerText = 0; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');
-    }
-
-    cpuSelectSDPieces() {
-        let cost = 0; let selected = [];
-        const caps = [...this.captured[OPPONENT]].sort(() => Math.random() - 0.5);
-        for(let type of caps) { if (cost + PIECE_POINTS[type] <= 12) { selected.push(type); cost += PIECE_POINTS[type]; } }
-        this.hands[OPPONENT] = selected;
-        this.checkSDFinishSelection();
-    }
-
-    checkSDFinishSelection() {
-        if ((this.isOnline || this.cpuLevel) && this.sdPhase === 1) {
-            this.sdPhase = 2; this.startSDPlacement();
-        } else if (this.sdPhase === 1) {
-            this.sdPhase = 2; this.startSDPlacement();
-        }
-    }
-
-    startSDPlacement() {
-        this.board = Array.from({length: 9}, () => Array(9).fill(null));
-        this.board[8][4] = {type: KING, owner: PLAYER, promoted: false};
-        this.board[0][4] = {type: KING, owner: OPPONENT, promoted: false};
-        this.kingPos = { [PLAYER]: {x:4,y:8}, [OPPONENT]: {x:4,y:0} };
-        
-        this.points = { [PLAYER]: 0, [OPPONENT]: 0 }; // 0リセット
-        
-        if (this.cpuLevel) {
-            const h = [...this.hands[OPPONENT]];
-            this.hands[OPPONENT] = [];
-            let emptyPos = [];
-            for (let y=0; y<=2; y++) for(let x=0; x<9; x++) if(!this.board[y][x]) emptyPos.push({x,y});
-            emptyPos.sort(() => Math.random() - 0.5);
-            h.forEach((type, i) => { if(emptyPos[i]) this.board[emptyPos[i].y][emptyPos[i].x] = {type, owner: OPPONENT, promoted: false}; });
-            this.sdReady[OPPONENT] = true;
-        }
-        
-        // ローカル2人の場合は先手に操作させる
-        if (!this.isOnline && !this.cpuLevel) this.turn = PLAYER;
-
-        this.updateMessage("自陣(手前3列)に駒を配置してください");
-        this.render();
-    }
-
-    checkSuddenDeathReady() {
-        if (!this.isOnline && !this.cpuLevel) {
-            if (this.turn === PLAYER) { this.turn = OPPONENT; this.updateMessage("後手: 駒を配置してください"); }
-            else { this.sdReady[PLAYER] = true; this.sdReady[OPPONENT] = true; }
-        }
-
-        if (this.sdReady[PLAYER] && this.sdReady[OPPONENT]) {
-            this.sdPhase = 3; this.targetPoints = 3; this.turn = PLAYER;
-            this.updateMessage("サドンデス開始！ 3pt先取で勝利");
-            window.showModal("配置完了", "サドンデス再開！ 3pt先取した方の勝利です。", [{text: "再開", onClick: window.hideModal}]);
-            this.clock.start();
-            this.render();
-        }
-    }
-
-    // --- CPU ---
     async cpuThink() {
-        this.updateMessage("CPU思考中..."); await new Promise(r=>setTimeout(r,50));
-        const am = this.getAllLegalMoves(OPPONENT); if(am.length===0) return;
-        let bM = null, pro = false;
-        if(this.cpuLevel===1) { bM = am[Math.floor(Math.random()*am.length)]; pro = this.canPromote(bM, OPPONENT) ? Math.random()>0.5 : false; }
-        else { const res = await this.getBestMoveAlphaBetaAsync(this.cpuLevel===2?2:3, OPPONENT, am); bM = res.move; pro = res.promote; }
-        if(bM) this.executeMove(bM.from, {x:bM.to.x, y:bM.to.y}, pro);
-    }
-    doMoveTemp(m, p, pro) {
-        const h = { hands: { [PLAYER]: [...this.hands[PLAYER]], [OPPONENT]: [...this.hands[OPPONENT]] }, pts: { [PLAYER]: this.points[PLAYER], [OPPONENT]: this.points[OPPONENT] } };
-        if(m.from.type) { h.fromType = m.from.type; h.toPiece = this.board[m.to.y][m.to.x]; const i = this.hands[p].indexOf(m.from.type); if(i>-1) this.hands[p].splice(i,1); this.board[m.to.y][m.to.x] = {type:m.from.type, owner:p, promoted:false}; }
-        else {
-            h.fromPiece = this.board[m.from.y][m.from.x]; h.toPiece = this.board[m.to.y][m.to.x];
-            let pc = {...h.fromPiece}; if(pro) pc.promoted=true;
-            if(h.toPiece) { if(this.gameMode==='point') this.points[p]+=PIECE_POINTS[h.toPiece.type]; else this.hands[p].push(h.toPiece.type); }
-            this.board[m.from.y][m.from.x]=null; this.board[m.to.y][m.to.x]=pc;
-        }
-        return h;
-    }
-    undoMoveTemp(m, p, h) {
-        this.hands[PLAYER]=h.hands[PLAYER]; this.hands[OPPONENT]=h.hands[OPPONENT]; this.points[PLAYER]=h.pts[PLAYER]; this.points[OPPONENT]=h.pts[OPPONENT];
-        if(m.from.type) this.board[m.to.y][m.to.x] = h.toPiece; else { this.board[m.from.y][m.from.x] = h.fromPiece; this.board[m.to.y][m.to.x] = h.toPiece; }
-    }
-    evaluateBoard() {
-        let s = 0;
-        const pV = { [PAWN]:100, [LANCE]:300, [KNIGHT]:400, [SILVER]:500, [GOLD]:600, [BISHOP]:800, [ROOK]:1000, [KING]:(this.gameMode==='point'?1500:10000), [WALL]:0 };
-        const ppV = { [PAWN]:600, [LANCE]:600, [KNIGHT]:600, [SILVER]:600, [BISHOP]:1200, [ROOK]:1500 };
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) {
-            const p=this.board[y][x];
-            if(p&&p.type!==WALL) { let v = p.promoted?ppV[p.type]:pV[p.type]; if(p.type!==KING) v += (p.owner===OPPONENT?y:(8-y))*2; if(p.owner===OPPONENT) s+=v; else s-=v; }
-        }
-        if (this.gameMode === 'point') { s += this.points[OPPONENT]*2000; s -= this.points[PLAYER]*2000; }
-        else { for(let t of this.hands[OPPONENT]) s+=pV[t]*1.1; for(let t of this.hands[PLAYER]) s-=pV[t]*1.1; }
-        return s;
-    }
-    async getBestMoveAlphaBetaAsync(d, p, im) {
-        let bS = -Infinity, bM = null, bP = false, a = -Infinity, b = Infinity; const ms = [...im].sort(()=>Math.random()-0.5);
-        for(let m of ms) {
-            for(let pro of (this.canPromote(m, p)?[true,false]:[false])) {
-                const h = this.doMoveTemp(m, p, pro); const s = this.alphaBetaSearch(d-1, a, b, PLAYER); this.undoMoveTemp(m, p, h);
-                if(s > bS) { bS = s; bM = m; bP = pro; } a = Math.max(a, bS);
+        this.updateMessage("CPUが思考中...");
+        await new Promise(r => setTimeout(r, 50));
+
+        if (this.cards[OPPONENT].length > 0 && Math.random() < 0.2) {
+            const cardIdx = Math.floor(Math.random() * this.cards[OPPONENT].length);
+            const card = this.cards[OPPONENT][cardIdx];
+            if (this.executeCPUCard(card, cardIdx)) {
+                await new Promise(r => setTimeout(r, 800));
             }
-            await new Promise(r=>setTimeout(r,0));
         }
-        return { move: bM||ms[0], promote: bP };
-    }
-    alphaBetaSearch(d, a, b, p) {
-        if(d===0) return this.evaluateBoard(); const ms = this.getAllLegalMoves(p); if(ms.length===0) return p===OPPONENT ? -99999-d : 99999+d;
-        if(p===OPPONENT) {
-            let mS = -Infinity;
-            for(let m of ms) for(let pro of (this.canPromote(m,p)?[true]:[false])) {
-                const h = this.doMoveTemp(m, p, pro); const s = this.alphaBetaSearch(d-1, a, b, PLAYER); this.undoMoveTemp(m, p, h);
-                mS = Math.max(mS, s); a = Math.max(a, s); if(b<=a) break;
-            }
-            return mS;
+
+        const moves = this.getAllLegalMoves(OPPONENT);
+        if (moves.length === 0) return;
+
+        let bestMove = null;
+        let promote = false;
+
+        if (this.cpuLevel === 1) {
+            bestMove = moves[Math.floor(Math.random() * moves.length)];
+            if (this.canPromote(bestMove, OPPONENT)) promote = Math.random() > 0.5;
         } else {
-            let mS = Infinity;
-            for(let m of ms) for(let pro of (this.canPromote(m,p)?[true]:[false])) {
-                const h = this.doMoveTemp(m, p, pro); const s = this.alphaBetaSearch(d-1, a, b, OPPONENT); this.undoMoveTemp(m, p, h);
-                mS = Math.min(mS, s); b = Math.min(b, s); if(b<=a) break;
+            const depth = this.cpuLevel === 2 ? 2 : 3;
+            const res = await this.getBestMoveAlphaBetaAsync(depth, OPPONENT, moves);
+            bestMove = res.move;
+            promote = res.promote;
+        }
+
+        if (bestMove) {
+            this.executeMove(bestMove.from, {x: bestMove.to.x, y: bestMove.to.y}, promote);
+        }
+    }
+
+    executeCPUCard(card, cardIdx) {
+        let success = false;
+        if (card === CARD_STEAL) {
+            if (this.hands[PLAYER].length > 0) {
+                const rIdx = Math.floor(Math.random() * this.hands[PLAYER].length);
+                const stolen = this.hands[PLAYER].splice(rIdx, 1)[0];
+                this.hands[OPPONENT].push(stolen);
+                success = true;
             }
-            return mS;
+        } else if (card === CARD_WALL) {
+            let emptyCells = [];
+            for (let y = 3; y < 6; y++) {
+                for (let x = 0; x < 9; x++) if (!this.board[y][x]) emptyCells.push({x, y});
+            }
+            if (emptyCells.length > 0) {
+                let tgt = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                this.board[tgt.y][tgt.x] = { type: WALL, owner: -1, duration: 4 };
+                success = true;
+            }
+        } else if (card === CARD_FREEZE) {
+            let targets = [];
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    let p = this.board[y][x];
+                    if (p && p.owner === PLAYER && p.type !== WALL) targets.push(p);
+                }
+            }
+            if (targets.length > 0) {
+                let tgt = targets[Math.floor(Math.random() * targets.length)];
+                tgt.frozen = 2;
+                success = true;
+            }
+        } else if (card === CARD_SHIELD || card === CARD_IDATEN) {
+            let targets = [];
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    let p = this.board[y][x];
+                    if (p && p.owner === OPPONENT && p.type !== WALL) targets.push(p);
+                }
+            }
+            if (targets.length > 0) {
+                let tgt = targets[Math.floor(Math.random() * targets.length)];
+                if (card === CARD_SHIELD) tgt.shielded = 2;
+                if (card === CARD_IDATEN) tgt.idaten = 2;
+                success = true;
+            }
+        }
+
+        if (success) {
+            this.cards[OPPONENT].splice(cardIdx, 1);
+            this.render();
+            return true;
+        }
+        return false;
+    }
+
+    evaluateBoard() {
+        let score = 0;
+        const pVals = { [PAWN]: 100, [LANCE]: 300, [KNIGHT]: 400, [SILVER]: 500, [GOLD]: 600, [BISHOP]: 800, [ROOK]: 1000, [KING]: 10000, [WALL]: 0 };
+        const pPromVals = { [PAWN]: 600, [LANCE]: 600, [KNIGHT]: 600, [SILVER]: 600, [BISHOP]: 1200, [ROOK]: 1500 };
+
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const p = this.board[y][x];
+                if (p && p.type !== WALL) {
+                    let val = p.promoted ? pPromVals[p.type] : pVals[p.type];
+                    if (p.type !== KING) {
+                        if (p.owner === OPPONENT) val += y * 2;
+                        else val += (8 - y) * 2;
+                    }
+                    if (p.owner === OPPONENT) score += val;
+                    else score -= val;
+                }
+            }
+        }
+
+        for (let type of this.hands[OPPONENT]) score += pVals[type] * 1.1;
+        for (let type of this.hands[PLAYER]) score -= pVals[type] * 1.1;
+
+        return score;
+    }
+
+    doMoveTemp(move, player, promote) {
+        const history = {
+            hands: { [PLAYER]: [...this.hands[PLAYER]], [OPPONENT]: [...this.hands[OPPONENT]] }
+        };
+        
+        if (move.from.type) {
+            history.fromType = move.from.type;
+            history.toPiece = this.board[move.to.y][move.to.x];
+            
+            const idx = this.hands[player].indexOf(move.from.type);
+            if(idx > -1) this.hands[player].splice(idx, 1);
+            this.board[move.to.y][move.to.x] = { type: move.from.type, owner: player, promoted: false };
+        } else {
+            history.fromPiece = this.board[move.from.y][move.from.x];
+            history.toPiece = this.board[move.to.y][move.to.x];
+            
+            let p = { ...history.fromPiece };
+            if (promote) p.promoted = true;
+            
+            if (history.toPiece) {
+                this.hands[player].push(history.toPiece.type);
+            }
+            this.board[move.from.y][move.from.x] = null;
+            this.board[move.to.y][move.to.x] = p;
+        }
+        return history;
+    }
+
+    undoMoveTemp(move, player, history) {
+        this.hands[PLAYER] = history.hands[PLAYER];
+        this.hands[OPPONENT] = history.hands[OPPONENT];
+        
+        if (move.from.type) {
+            this.board[move.to.y][move.to.x] = history.toPiece;
+        } else {
+            this.board[move.from.y][move.from.x] = history.fromPiece;
+            this.board[move.to.y][move.to.x] = history.toPiece;
+        }
+    }
+
+    async getBestMoveAlphaBetaAsync(depth, player, initialMoves) {
+        let bestScore = -Infinity;
+        let bestMove = null;
+        let bestPromote = false;
+        let alpha = -Infinity;
+        let beta = Infinity;
+
+        const moves = [...initialMoves].sort(() => Math.random() - 0.5);
+
+        for (let m of moves) {
+            const canPro = this.canPromote(m, player);
+            const promotes = canPro ? [true, false] : [false];
+            
+            for (let pro of promotes) {
+                const history = this.doMoveTemp(m, player, pro);
+                const score = this.alphaBetaSearch(depth - 1, alpha, beta, PLAYER);
+                this.undoMoveTemp(m, player, history);
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = m;
+                    bestPromote = pro;
+                }
+                alpha = Math.max(alpha, bestScore);
+            }
+            await new Promise(r => setTimeout(r, 0));
+        }
+
+        return { move: bestMove || moves[0], promote: bestPromote };
+    }
+
+    alphaBetaSearch(depth, alpha, beta, player) {
+        if (depth === 0) return this.evaluateBoard();
+
+        const moves = this.getAllLegalMoves(player);
+        if (moves.length === 0) {
+            return player === OPPONENT ? -99999 - depth : 99999 + depth;
+        }
+
+        if (player === OPPONENT) {
+            let maxScore = -Infinity;
+            for (let m of moves) {
+                const canPro = this.canPromote(m, player);
+                const promotes = canPro ? [true] : [false];
+                for (let pro of promotes) {
+                    const history = this.doMoveTemp(m, player, pro);
+                    const score = this.alphaBetaSearch(depth - 1, alpha, beta, PLAYER);
+                    this.undoMoveTemp(m, player, history);
+                    maxScore = Math.max(maxScore, score);
+                    alpha = Math.max(alpha, score);
+                    if (beta <= alpha) break;
+                }
+                if (beta <= alpha) break;
+            }
+            return maxScore;
+        } else {
+            let minScore = Infinity;
+            for (let m of moves) {
+                const canPro = this.canPromote(m, player);
+                const promotes = canPro ? [true] : [false];
+                for (let pro of promotes) {
+                    const history = this.doMoveTemp(m, player, pro);
+                    const score = this.alphaBetaSearch(depth - 1, alpha, beta, OPPONENT);
+                    this.undoMoveTemp(m, player, history);
+                    minScore = Math.min(minScore, score);
+                    beta = Math.min(beta, score);
+                    if (beta <= alpha) break;
+                }
+                if (beta <= alpha) break;
+            }
+            return minScore;
         }
     }
 
     render() {
-        for(let y=0;y<9;y++) for(let x=0;x<9;x++) {
-            const c=this.cells[y][x], p=this.board[y][x]; let cC = 'cell';
-            if(this.selected&&this.selected.type==='board'&&this.selected.x===x&&this.selected.y===y) cC+=' selected';
-            if(this.lastMove&&((this.lastMove.from.type==='board'&&this.lastMove.from.x===x&&this.lastMove.from.y===y)||(this.lastMove.to.x===x&&this.lastMove.to.y===y))) cC+=' last-move';
-            if(this.legalMoves.some(m=>m.toX===x&&m.toY===y)) cC+=' highlight';
-            if(p) { if(p.shielded) cC+=' shielded-cell'; if(p.frozen) cC+=' frozen-cell'; if(p.idaten) cC+=' idaten-cell'; }
-            if(c.className!==cC) c.className=cC;
-            let pE=c.firstChild;
-            if(p) {
-                if(!pE){ pE=document.createElement('div'); c.appendChild(pE); }
-                let pC = 'piece'; if(p.owner===OPPONENT) pC+=' opponent-piece'; if(p.promoted) pC+=' promoted'; if(p.type===WALL) pC+=' wall';
-                if(pE.className!==pC) pE.className=pC;
-                let str = p.type===WALL?'壁':pieceStrs[p.type][p.promoted?1:0]; if(p.type===KING&&p.owner===OPPONENT) str='王';
-                if(pE.innerText!==str) pE.innerText=str;
-            } else if(pE) c.removeChild(pE);
-        }
-        this.renderHand(PLAYER, 'player-hand'); this.renderHand(OPPONENT, 'opponent-hand');
-        this.renderCards(PLAYER, 'player-cards'); this.renderCards(OPPONENT, 'opponent-cards');
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const cell = this.cells[y][x];
+                const piece = this.board[y][x];
+                
+                let cClasses = 'cell';
+                if (this.selected && this.selected.type === 'board' && this.selected.x === x && this.selected.y === y) cClasses += ' selected';
+                if (this.lastMove && ((this.lastMove.from.type === 'board' && this.lastMove.from.x === x && this.lastMove.from.y === y) || (this.lastMove.to.x === x && this.lastMove.to.y === y))) cClasses += ' last-move';
+                if (this.legalMoves.some(m => m.toX === x && m.toY === y)) cClasses += ' highlight';
+                
+                if (piece) {
+                    if (piece.shielded) cClasses += ' shielded-cell';
+                    if (piece.frozen) cClasses += ' frozen-cell';
+                    if (piece.idaten) cClasses += ' idaten-cell';
+                }
 
-        if (this.gameMode === 'point') {
-            document.getElementById('player-score').innerText = `${this.points[PLAYER]} / ${this.sdPhase===3?3:this.targetPoints} pt`;
-            document.getElementById('opponent-score').innerText = `${this.points[OPPONENT]} / ${this.sdPhase===3?3:this.targetPoints} pt`;
+                if (cell.className !== cClasses) cell.className = cClasses;
+
+                let pieceEl = cell.firstChild;
+
+                if (piece) {
+                    if (!pieceEl) {
+                        pieceEl = document.createElement('div');
+                        cell.appendChild(pieceEl);
+                    }
+                    
+                    let pClasses = 'piece';
+                    if (piece.owner === OPPONENT) pClasses += ' opponent-piece';
+                    if (piece.promoted) pClasses += ' promoted';
+                    if (piece.type === WALL) pClasses += ' wall';
+
+                    if (pieceEl.className !== pClasses) pieceEl.className = pClasses;
+                    
+                    let pStr = piece.type === WALL ? '壁' : pieceStrs[piece.type][piece.promoted ? 1 : 0];
+                    if (piece.type === KING && piece.owner === OPPONENT) pStr = '王';
+                    
+                    if (pieceEl.innerText !== pStr) pieceEl.innerText = pStr;
+                } else {
+                    if (pieceEl) cell.removeChild(pieceEl);
+                }
+            }
         }
+
+        this.renderHand(PLAYER, 'player-hand');
+        this.renderHand(OPPONENT, 'opponent-hand');
+        this.renderCards(PLAYER, 'player-cards');
+        this.renderCards(OPPONENT, 'opponent-cards');
     }
-    renderCards(p, id) {
-        if(this.gameMode === 'point') return; // 今回はポイント将棋ではカード非表示
-        const c = document.getElementById(id); c.innerHTML='';
-        this.cards[p].forEach((card, idx) => {
-            const el = document.createElement('div'); el.className = 'card' + (this.targetingCard&&this.targetingCard.player===p&&this.targetingCard.index===idx?' selected-card':'');
-            el.innerText = card; el.onclick = () => this.handleClick('card', -1, -1, p, idx); c.appendChild(el);
+
+    renderCards(player, containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        this.cards[player].forEach((card, idx) => {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'card';
+            cardEl.innerText = card;
+            
+            if (this.targetingCard && this.targetingCard.player === player && this.targetingCard.index === idx) {
+                cardEl.classList.add('selected-card');
+            }
+            
+            cardEl.onclick = () => { this.handleClick('card', -1, -1, player, idx); };
+            container.appendChild(cardEl);
         });
     }
-    renderHand(p, id) {
-        const c = document.getElementById(id); c.innerHTML=''; const counts={};
-        this.hands[p].forEach(t => counts[t]=(counts[t]||0)+1);
-        [ROOK, BISHOP, GOLD, SILVER, KNIGHT, LANCE, PAWN, KING].forEach(t => { // サドンデス用王将追加
-            if(counts[t]) {
-                const w = document.createElement('div'); w.className = 'hand-piece'+(p===OPPONENT?' opponent-piece':'');
-                if(this.selected&&this.selected.type==='hand'&&this.selected.pieceType===t&&this.turn===p) w.classList.add('selected');
-                w.innerText = pieceStrs[t][0]; if(counts[t]>1) { const cnt=document.createElement('span'); cnt.className='hand-count'; cnt.innerText=counts[t]; w.appendChild(cnt); }
-                w.onclick = () => this.handleHandClick(p, t); c.appendChild(w);
+
+    renderHand(player, containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        const counts = {};
+        const displayOrder = [ROOK, BISHOP, GOLD, SILVER, KNIGHT, LANCE, PAWN];
+        this.hands[player].forEach(p => { counts[p] = (counts[p] || 0) + 1; });
+
+        displayOrder.forEach(type => {
+            if (counts[type]) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'hand-piece';
+                if (this.selected && this.selected.type === 'hand' && this.selected.pieceType === type && this.turn === player) {
+                    wrapper.classList.add('selected');
+                }
+                if (player === OPPONENT) wrapper.classList.add('opponent-piece');
+                
+                wrapper.innerText = pieceStrs[type][0];
+                if (counts[type] > 1) {
+                    const cnt = document.createElement('span');
+                    cnt.className = 'hand-count';
+                    cnt.innerText = counts[type];
+                    wrapper.appendChild(cnt);
+                }
+                wrapper.onclick = () => { this.handleHandClick(player, type); };
+                container.appendChild(wrapper);
             }
         });
     }
 }
 
-const modalOverlay=document.getElementById('modal-overlay'), modalTitle=document.getElementById('modal-title'), modalMessage=document.getElementById('modal-message'), modalButtons=document.getElementById('modal-buttons'), modalContent=document.getElementById('modal-content'), modalInputContainer=document.getElementById('modal-input-container'), modalInput=document.getElementById('modal-input');
-window.showModal = function(t, m, b, isO=false, sI=false) {
-    modalTitle.innerHTML=t; modalMessage.innerHTML=m; modalButtons.innerHTML='';
-    if(sI){modalInputContainer.classList.remove('hidden');modalInput.value="";}else modalInputContainer.classList.add('hidden');
-    if(isO)modalContent.classList.add('rotate-180'); else modalContent.classList.remove('rotate-180');
-    b.forEach(btn=>{ const el=document.createElement('button'); el.innerText=btn.text; el.className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex-1 font-bold whitespace-nowrap"; el.onclick=btn.onClick; modalButtons.appendChild(el); });
-    modalOverlay.style.display='flex';
+// モーダル管理
+const modalOverlay = document.getElementById('modal-overlay');
+const modalTitle = document.getElementById('modal-title');
+const modalMessage = document.getElementById('modal-message');
+const modalButtons = document.getElementById('modal-buttons');
+const modalContent = document.getElementById('modal-content');
+const modalInputContainer = document.getElementById('modal-input-container');
+const modalInput = document.getElementById('modal-input');
+
+window.showModal = function(title, message, buttons, isOpponent = false, showInput = false) {
+    modalTitle.innerHTML = title;
+    modalMessage.innerHTML = message;
+    modalButtons.innerHTML = '';
+    
+    if (showInput) { modalInputContainer.classList.remove('hidden'); modalInput.value = ""; } 
+    else { modalInputContainer.classList.add('hidden'); }
+
+    if (isOpponent) modalContent.classList.add('rotate-180');
+    else modalContent.classList.remove('rotate-180');
+
+    buttons.forEach(b => {
+        const btn = document.createElement('button');
+        btn.innerText = b.text;
+        btn.className = "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex-1 font-bold whitespace-nowrap";
+        btn.onclick = b.onClick;
+        modalButtons.appendChild(btn);
+    });
+    modalOverlay.style.display = 'flex';
 }
-window.hideModal = function() { modalOverlay.style.display='none'; }
-window.showCardHelp = function(p) { if(game.gameMode==='point')return; window.showModal("特殊カードの効果", `<div class="text-left text-sm space-y-3 max-w-sm mt-2"><p><strong>強奪</strong>: 相手の持駒1つ奪う</p><p><strong>氷結</strong>: 敵駒1つを1ターン移動不可</p><p><strong>盾</strong>: 味方駒1つを1ターン無敵</p><p><strong>韋駄天</strong>: 味方駒1つを1ターン飛車角移動</p><p><strong>壁設置</strong>: 空きマスに4ターンの壁</p></div>`, [{text:"閉じる",onClick:window.hideModal}], p===OPPONENT); }
-window.showPointRule = function() {
-    window.showModal("持ち駒将棋 ルール", `<div class="text-left text-sm space-y-2 max-w-sm mt-2 text-[#4a3623]">
-        <p><strong>【勝利条件】</strong>: 王を詰ますのではなく、目標ポイントを先取すれば勝ち。</p>
-        <p><strong>【玉(王)】</strong>: 15pt。取られても負けではなく周囲8マス動ける最強の駒。</p>
-        <p><strong>【ポイント一覧】</strong><br>玉:15, 飛:10, 角:8, 金:6, 銀:5, 桂:4, 香:3, 歩:1</p>
-        <p><strong>【持駒制限】</strong>: 獲得した駒はポイントになり、「打つ」ことはできない。</p>
-        <p><strong>【サドンデス】</strong>: 盤面が全滅、または78-78で手詰まりになった場合、獲得した駒から12pt以下で選び自陣に配置。先に3pt先取で勝利。</p>
-    </div>`, [{text:"閉じる",onClick:window.hideModal}]);
+
+window.hideModal = function() { modalOverlay.style.display = 'none'; }
+
+window.showCardHelp = function(player = PLAYER) {
+    const helpHTML = `
+        <div class="text-left text-sm space-y-3 text-[#4a3623] max-w-sm mt-2">
+            <p><strong>【強奪】</strong><br>相手の持ち駒からランダムに1つ奪います。</p>
+            <p><strong>【氷結】</strong><br>指定した敵の駒1つを、次の相手ターン終了時まで<br>移動不可にします。</p>
+            <p><strong>【盾】</strong><br>指定した味方の駒1つを、1ターンの間相手がその駒を<br>取れなくなります。</p>
+            <p><strong>【韋駄天】</strong><br>指定した味方の駒1つが、1ターンの間「飛車＋角行」の<br>動きになります。</p>
+            <p><strong>【壁設置】</strong><br>空きマスに移動・通過不可の「壁」を設置します<br>（4手で消滅）。</p>
+        </div>
+    `;
+    window.showModal("特殊カードの効果", helpHTML, [{text: "閉じる", onClick: window.hideModal}], player === OPPONENT);
 }
 
 let game;
 window.onload = async () => {
-    await initFirebase(); game = new Game();
-    document.getElementById('reset-btn').addEventListener('click', () => { if(game.isOnline)return; window.showModal("確認","最初からやり直しますか？",[{text:"はい",onClick:()=>{game.initBoard();window.hideModal();}},{text:"いいえ",onClick:window.hideModal}]); });
-    document.getElementById('apply-clock-btn').addEventListener('click', () => { if(game.isOnline)return; window.showModal("適用","適用してやり直しますか？",[{text:"はい",onClick:()=>{game.initBoard();window.hideModal();}},{text:"いいえ",onClick:window.hideModal}]); });
-    document.getElementById('menu-local').addEventListener('click', () => { window.showModal("2人対戦","オフラインで開始しますか？",[{text:"はい",onClick:()=>{game.exitOnline();game.cpuLevel=null;game.gameMode='normal';game.initBoard(false);window.hideModal();}},{text:"いいえ",onClick:window.hideModal}]); });
-    document.getElementById('menu-cpu').addEventListener('click', () => { window.showModal("CPU対戦","強さを選んでください。",[{text:"初級",onClick:()=>{window.hideModal();game.startCPUGame(1);}},{text:"中級",onClick:()=>{window.hideModal();game.startCPUGame(2);}},{text:"上級",onClick:()=>{window.hideModal();game.startCPUGame(3);}},{text:"閉じる",onClick:window.hideModal}]); });
-    document.getElementById('menu-online').addEventListener('click', () => { window.showModal("オンライン","どのように始めますか？(通常ルール)",[{text:"部屋を作る",onClick:()=>{window.hideModal();game.gameMode='normal';game.createRoom();}},{text:"部屋に入る",onClick:()=>{window.showModal("部屋に参加","5文字のコードを入力",[{text:"入室",onClick:()=>{const code=document.getElementById('modal-input').value.toUpperCase();if(code.length===5)game.joinRoom(code);}},{text:"キャンセル",onClick:window.hideModal}],false,true);}}]); });
-    document.getElementById('menu-point35').addEventListener('click', () => { window.showModal("持ち駒将棋(35pt)","対戦相手を選んでください。",[{text:"2人(ローカル)",onClick:()=>{window.hideModal();game.startPointGame(35);}},{text:"CPU初級",onClick:()=>{window.hideModal();game.startPointGame(35,true,1);}},{text:"キャンセル",onClick:window.hideModal}]); });
-    document.getElementById('menu-point79').addEventListener('click', () => { window.showModal("持ち駒将棋(79pt)","対戦相手を選んでください。",[{text:"2人(ローカル)",onClick:()=>{window.hideModal();game.startPointGame(79);}},{text:"CPU上級",onClick:()=>{window.hideModal();game.startPointGame(79,true,3);}},{text:"キャンセル",onClick:window.hideModal}]); });
+    await initFirebase();
+    game = new Game();
+    
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        if (game.isOnline) {
+            window.showModal("確認", "オンライン対戦中はリセットできません。", [{text: "閉じる", onClick: window.hideModal}]);
+            return;
+        }
+        window.showModal("確認", "最初からやり直しますか？", [
+            { text: "はい", onClick: () => { game.initBoard(); window.hideModal(); } },
+            { text: "いいえ", onClick: window.hideModal }
+        ]);
+    });
+    
+    document.getElementById('apply-clock-btn').addEventListener('click', () => {
+        if (game.isOnline) {
+            window.showModal("確認", "オンライン対戦中は設定を変更できません。", [{text: "閉じる", onClick: window.hideModal}]);
+            return;
+        }
+        window.showModal("設定の適用", "設定を適用して最初からやり直しますか？", [
+            { text: "はい", onClick: () => { game.initBoard(); window.hideModal(); } },
+            { text: "いいえ", onClick: window.hideModal }
+        ]);
+    });
+
+    document.getElementById('menu-local').addEventListener('click', () => {
+        window.showModal("2人対戦", "オフラインで2人対戦を開始しますか？", [
+            { text: "はい", onClick: () => { game.exitOnline(); game.cpuLevel = null; game.initBoard(false); window.hideModal(); } },
+            { text: "いいえ", onClick: window.hideModal }
+        ]);
+    });
+
+    document.getElementById('menu-cpu').addEventListener('click', () => {
+        window.showModal("CPU対戦", "CPUの強さを選んでください。", [
+            { text: "初級", onClick: () => { window.hideModal(); game.startCPUGame(1); } },
+            { text: "中級", onClick: () => { window.hideModal(); game.startCPUGame(2); } },
+            { text: "上級", onClick: () => { window.hideModal(); game.startCPUGame(3); } },
+            { text: "閉じる", onClick: window.hideModal }
+        ]);
+    });
+
+    document.getElementById('menu-online').addEventListener('click', () => {
+        window.showModal("オンライン対戦", "どのように始めますか？", [
+            { text: "部屋を作る", onClick: () => { window.hideModal(); game.createRoom(); } },
+            { text: "部屋に入る", onClick: () => {
+                window.showModal("部屋に参加", "5文字のコードを入力してください。", [
+                    { text: "入室", onClick: () => {
+                        const code = document.getElementById('modal-input').value.toUpperCase();
+                        if (code.length === 5) game.joinRoom(code);
+                        else window.showModal("入力エラー", "5文字で入力してください。", [{text: "OK", onClick: window.hideModal}]);
+                    }},
+                    { text: "キャンセル", onClick: window.hideModal }
+                ], false, true);
+            }}
+        ]);
+    });
 };
 </script>
 </body>
 </html>
-```eof
